@@ -1,6 +1,8 @@
 {
   "files.associations": {
     "wait.h": "c",
-    "type_traits": "cpp"
+    "type_traits": "cpp",
+    "hashtable.h": "c",
+    "vector": "c"
   }
 }

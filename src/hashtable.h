@@ -12,7 +12,6 @@ struct hash_node {  // Κόμβος του hash-table
     struct hash_node *next; // Pointer στον επόμενο hash_node στο ίδιο bucket. // Seperate Chaining
 };
 
-
 unsigned long hash(unsigned char *str, int capacity);
 
 struct hash_table *create_hash_table(int capacity);
@@ -22,5 +21,7 @@ void insert_hash_table(struct hash_table *table, char *key);
 struct hash_node *search_hash_table(struct hash_table *table, char *key);
 
 void destroy_hash_table(struct hash_table *table);
+
+void print_hash_table(struct hash_table *table);
 
 #endif

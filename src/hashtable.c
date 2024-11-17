@@ -1,8 +1,9 @@
 #include <stdio.h>
-#include <hashtable.h>
+#include <stdlib.h>
+#include <string.h>
+#include "hashtable.h"
 
 // Hash function
-
 unsigned long hash(unsigned char *str, int capacity)
 {
     unsigned long hash = 5381;
@@ -14,8 +15,8 @@ unsigned long hash(unsigned char *str, int capacity)
 
 struct hash_table *create_hash_table(int capacity){
     struct hash_table *table = malloc(sizeof(struct hash_table));
-    table->capacity;
-    table->array = malloc(table->capacity * sizeof(struct hash_node*));
+    table->capacity = capacity;
+    table->array = calloc(capacity, sizeof(struct hash_node*));    
     return table;
 }
 
@@ -40,7 +41,7 @@ void insert_hash_table(struct hash_table *table, char *key) {
 }
 
 struct hash_node *search_hash_table(struct hash_table *table, char *key){
-    unsigned long index = hash(table, key);
+    unsigned long index = hash(key, table->capacity);
 
     struct hash_node *node_to_search = table->array[index];
     while (node_to_search != NULL){
@@ -51,7 +52,6 @@ struct hash_node *search_hash_table(struct hash_table *table, char *key){
     }
     return NULL;
 }
-
 
 void destroy_hash_table(struct hash_table *table){
     for (int i = 0; i < table->capacity; i++) {
@@ -67,3 +67,18 @@ void destroy_hash_table(struct hash_table *table){
     free(table->array);
     free(table);
 }
+
+void print_hash_table(struct hash_table *table) {
+
+    for (int i = 0; i < table->capacity; i++) {
+        struct hash_node *node = table->array[i];  
+
+
+        while (node != NULL) {
+            printf("Bucket: %d, Word: %s, Frequency: %d\n",i, node->key, node->value);
+            node = node->next;
+        }
+    }
+}
+
+
