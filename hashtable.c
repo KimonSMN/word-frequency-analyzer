@@ -73,10 +73,15 @@ void print_hash_table(struct hash_table *table) {
     for (int i = 0; i < table->capacity; i++) {
         struct hash_node *node = table->array[i];  
 
+        if (node != NULL) {
+            printf("Bucket %d:\n", i);
+        }
 
         while (node != NULL) {
-            printf("Bucket: %d Word: %s Frequency: %d\n",i, node->key, node->value);
+            printf("\tWord: %s Frequency: %d\n", node->key, node->value);
+            
             node = node->next;
+            
         }
     }
 }

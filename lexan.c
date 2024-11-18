@@ -7,26 +7,9 @@
 #include <fcntl.h>
 #include <signal.h>
 
-void trim_newline(char *str) {
-    size_t len = strlen(str);
-    if (len > 0 && (str[len - 1] == '\n' || str[len - 1] == '\r')) {
-        str[len - 1] = '\0';
-    }
-}
 
-void clean_text(char *str) {
-    
-    size_t len = strlen(str);
-    int j = 0; // Index for the updated string
-
-    for (int i = 0; i < len; i++) {
-        if((str[i] >= 65 && str[i] <= 90 || str[i] >= 97 && str[i] <= 122 || str[i] == ' ')) {
-            str[j++] = str[i]; // Copy it to the new position
-        }
-    }
-    str[j] = '\0';
-}
-
+#include "splitter.h"
+#include "builder.h"
 
 int main(int argc, char *argv[]) {
 
@@ -76,8 +59,6 @@ int main(int argc, char *argv[]) {
     int pidsBuilders[numOfBuilders];
     int pidsSplitter[numOfSplitters];
 
-
-
     //////// FORK SPLITTERS ////////
 
     for (int i = 0; i < numOfSplitters; i++){
@@ -101,13 +82,8 @@ int main(int argc, char *argv[]) {
                 }
             }
 
-            // TEST LOGIC HERE
+            splitter(i, numOfSplitters, numOfBuilders, inputFile, 17, pipes);
 
-            // const char *data = "word"; // Example data
-            // for (int b = 0; b < numOfBuilders; b++) {
-            //     write(pipes[i][b][1], data, strlen(data) + 1); // Send data to builder
-            // }
-            
             // Close all write ends after writing
             for (int b = 0; b < numOfBuilders; b++) {
                 close(pipes[i][b][1]);
@@ -144,14 +120,7 @@ int main(int argc, char *argv[]) {
                 }
             }
 
-            // TEST LOGIC HERE
-
-            // char buffer[256]; // Buffer for reading data
-            // for (int s = 0; s < numOfSplitters; s++) {
-            //     if (read(pipes[s][i][0], buffer, sizeof(buffer)) > 0) {
-            //         printf("Builder %d received: %s\n", i, buffer);
-            //     }
-            // }
+            builder(i, numOfSplitters, numOfBuilders, pipes);
 
             // Close all read ends after reading
             for (int s = 0; s < numOfSplitters; s++) {
@@ -165,11 +134,13 @@ int main(int argc, char *argv[]) {
 
     // PARENT PROCESS
 
+
+
     // Cloes all pipe ends
-    for (int i = 0; i < numOfSplitters; i++) {
-        for (int j = 0; j < numOfBuilders; j++) {
-            close(pipes[i][j][0]);
-            close(pipes[i][j][1]);
+    for (int s = 0; s < numOfSplitters; s++) {
+        for (int b = 0; b < numOfBuilders; b++) {
+            close(pipes[s][b][0]);
+            close(pipes[s][b][1]);
         }
     }
 
@@ -178,15 +149,13 @@ int main(int argc, char *argv[]) {
         wait(NULL);
     }
 
-    //////// PRINT COMMAND LINE ARGUMENTS ////////
+    ////// PRINT COMMAND LINE ARGUMENTS ////////
     // printf("Input File: %s\n", inputFile);
     // printf("Number of Splitters: %d\n", numOfSplitters);
     // printf("Number of Builders: %d\n", numOfBuilders);
     // printf("Top-K Words: %d\n", topK);
     // printf("Exclusion List File: %s\n", exclusionList);
     // printf("Output File: %s\n", outputFile);
-
- 
 
     return 0;
 }

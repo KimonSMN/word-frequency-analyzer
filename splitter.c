@@ -30,7 +30,11 @@ void clean_text(char *str) {
 }
 
 
-void splitter(struct hash_table *table, int splitterIndex, int numOfSplitters, int numOfBuilders, char *inputFile, int inputFileLines ,int pipes[][2]){
+void splitter(int splitterIndex, int numOfSplitters, int numOfBuilders, char *inputFile, int inputFileLines, int pipes[numOfSplitters][numOfBuilders][2]){
+
+    for (int b = 0; b < numOfBuilders; b++) {
+        close(pipes[splitterIndex][b][0]); // Close read ends
+    }
 
     FILE *file = fopen(inputFile, "r");
 
@@ -51,59 +55,43 @@ void splitter(struct hash_table *table, int splitterIndex, int numOfSplitters, i
         }
     }
 
-    // Process lines in the range [sectionFrom, sectionTo)
+    // Process lines from sectionFrom to sectionTo
     char* token;
     char* delim = " "; 
     
     for(int i = sectionFrom; i < sectionTo; i++){
         // logic
-
         getline(&line, &len, file);
         clean_text(line);
+        trim_newline(line);
         token = strtok(line, delim);
 
         while (token) {
-            insert_hash_table(table, token);
+            // insert_hash_table(table, token);
+            // printf("Token: %s\n", token);
+            unsigned long bucketForWord = hash(token, 100);
+            int builderIndex = bucketForWord % numOfBuilders;
+            // printf("Splitter %d sends '%s' to Builder %d\n", splitterIndex, token, builderIndex);
+
+            // Send Word to builder
+            int n = strlen(token) + 1;
+
+            printf("Splitter %d writes length %d for '%s' to Builder %d\n", splitterIndex, n, token, builderIndex);
+            if (write(pipes[splitterIndex][builderIndex][1], &n, sizeof(int)) < 0) {
+                perror("Error writing n to pipe");
+            }
+
+            printf("Splitter %d writes '%s' to Builder %d\n", splitterIndex, token, builderIndex);
+            if (write(pipes[splitterIndex][builderIndex][1], token, sizeof(char) * n) < 0) {
+                perror("Error writing to pipe");
+            }
             token = strtok(NULL, delim);
         }
-        // printf("%s\n", line);
-
     }
 
-    fclose(file);
-}
-
-
-int main() {
-    char *inputFile = "numbers.txt"; // Example input file
-    int numOfSplitters = 4;       // Number of splitters
-    int numOfBuilders = 3;        // Example builders count (not used in this test)
-
-    struct hash_table *table = create_hash_table(100);
-
-    // Count the total lines in the file
-    int inputFileLines = 17;
-    if (inputFileLines == -1) {
-        perror("Failed to count lines");
-        exit(1);
-    }
-    printf("Total lines in the file: %d\n", inputFileLines);
-
-    // Simulate pipes for testing
-    int pipes[numOfBuilders][2];
     for (int b = 0; b < numOfBuilders; b++) {
-        if (pipe(pipes[b]) == -1) {
-            perror("Pipe creation failed");
-            return 1;
-        }
+        printf("Splitter %d finished sending and closed pipes\n", splitterIndex);
+        close(pipes[splitterIndex][b][1]); // Close write ends
     }
-
-    // Test each splitter
-    for (int i = 0; i < numOfSplitters; i++) {
-        printf("\n--- Splitter %d Output ---\n", i);
-        splitter(table, i, numOfSplitters, numOfBuilders, inputFile, inputFileLines, pipes);
-    }
-
-    print_hash_table(table);
-    return 0;
+    fclose(file);
 }

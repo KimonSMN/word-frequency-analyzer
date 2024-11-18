@@ -1,28 +1,34 @@
-# Makefile for compiling the pipe communication program
-
 # Compiler
 CC = gcc
 
 # Compiler flags
-CFLAGS = 
+CFLAGS =  
 
 # Output executable name
-TARGET = splitter
+TARGET = lexan
 
 # Source files
-SRC = splitter.c hashtable.c
+SRC = lexan.c hashtable.c splitter.c builder.c
 
-HEADERS = hashtable.h
+# Object files (replace .c with .o)
+OBJ = $(SRC:.c=.o)
 
-# Build target
+# Header files
+HEADERS = hashtable.h splitter.h builder.h
+
+# Build the target executable
 all: $(TARGET)
 
-$(TARGET): $(SRC) $(HEADERS)
-	$(CC) $(CFLAGS) -o $(TARGET) $(SRC)
+$(TARGET): $(OBJ)
+	$(CC) $(CFLAGS) -o $(TARGET) $(OBJ)
 
-# Clean target to remove the executable
+# Compile .c files into .o files
+%.o: %.c $(HEADERS)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+# Clean target to remove object files and the executable
 clean:
-	rm -f $(TARGET)
+	rm -f $(TARGET) $(OBJ)
 
 # PHONY targets
 .PHONY: all clean
