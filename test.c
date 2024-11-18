@@ -7,6 +7,27 @@
 #include <fcntl.h>
 #include <signal.h>
 
+void trim_newline(char *str) {
+    size_t len = strlen(str);
+    if (len > 0 && (str[len - 1] == '\n' || str[len - 1] == '\r')) {
+        str[len - 1] = '\0';
+    }
+}
+
+void clean_text(char *str) {
+    
+    size_t len = strlen(str);
+    int j = 0; // Index for the updated string
+
+    for (int i = 0; i < len; i++) {
+        if((str[i] >= 65 && str[i] <= 90 || str[i] >= 97 && str[i] <= 122 || str[i] == ' ')) {
+            str[j++] = str[i]; // Copy it to the new position
+        }
+    }
+    str[j] = '\0';
+}
+
+
 int main(int argc, char *argv[]) {
 
     //////// HANDLE COMMAND LINE ARGUMENTS ////////

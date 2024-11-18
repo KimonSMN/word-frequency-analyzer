@@ -9,6 +9,9 @@
     "string.h": "c",
     "stdio.h": "c",
     "unistd.h": "c",
-    "fcntl.h": "c"
+    "fcntl.h": "c",
+    "*.tcc": "c",
+    "string": "c",
+    "streambuf": "c"
   }
 }

@@ -7,11 +7,6 @@
 #include <fcntl.h>
 #include <signal.h>
 
-#include "hashtable.h"
-
-#define MAX_LEN 100
-
-// Function to trim newline characters from a string
 void trim_newline(char *str) {
     size_t len = strlen(str);
     if (len > 0 && (str[len - 1] == '\n' || str[len - 1] == '\r')) {
@@ -33,73 +28,165 @@ void clean_text(char *str) {
 }
 
 
+int main(int argc, char *argv[]) {
 
-int main(int argc, char* argv[]) {
+    //////// HANDLE COMMAND LINE ARGUMENTS ////////
 
-    struct hash_table *table = create_hash_table(300);
+    char *inputFile = NULL;
+    int numOfSplitters = 0;
+    int numOfBuilders = 0;
+    int topK = 0;
+    char *exclusionList = NULL;
+    char *outputFile = NULL;
 
-    int fd[2]; // fd[0] => read, fd[1] => write
-    if (pipe(fd) == -1) return 1;
-
-    int pid = fork(); // Duplicate the process
-    if (pid == -1) return 2; // Check for errors
-
-    if(pid == 0){ // child process
-        // will write all the words
-        close(fd[0]); // we don't read here
-
-        FILE *file = fopen("test.txt", "r");
-        if (!file) {
-            printf("error opening file");
-            close(fd[1]);
-            return 3;
+    // Parse the arguments
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "-i") == 0) {
+            inputFile = argv[++i];
+        } else if (strcmp(argv[i], "-l") == 0) {
+            numOfSplitters = atoi(argv[++i]);        // Number of Splitters initialized in the command line
+        } else if (strcmp(argv[i], "-m") == 0) {
+            numOfBuilders = atoi(argv[++i]);        // Number of Builders initialized in the command line
+        } else if (strcmp(argv[i], "-t") == 0) {
+            topK = atoi(argv[++i]);
+        } else if (strcmp(argv[i], "-e") == 0) {
+            exclusionList = argv[++i];
+        } else if (strcmp(argv[i], "-o") == 0) {
+            outputFile = argv[++i];
+        } else {
+            printf("Unknown argument: %s\n", argv[i]);
+            return 1;
         }
+    }
 
-        // char str[200] = "I am really good at programing!";        
-        // str[strlen(str) - 1] = '\0';
+    //////// CREATE PIPES ////////
 
-        char line[MAX_LEN];
-        while(fgets(line, MAX_LEN, file)){
-            trim_newline(line);
-            clean_text(line);
-            printf("%s\n",line);
-            int n = strlen(line) + 1;
-            if(write(fd[1], &n, sizeof(int)) < 0){ //send the number of characters through the pipe
-                fclose(file);
-                close(fd[1]);
-                return 4;
-            }
-            if (write(fd[1], line, sizeof(char) * n) < 0){
-                fclose(file);
-                close(fd[1]);
-                return 5;
-            }
-        }
-        fclose(file);
-        close(fd[1]);
-    } else { // parent process 
-        // will read and process the words
-        close(fd[1]); // we don't write here  
-        char str[MAX_LEN]; 
-        int n;  // number of characters
+    int pipes[numOfSplitters][numOfBuilders][2];    // Pipe structure pipe[0] => read, pipe[1] => write
 
-        while(read(fd[0], &n, sizeof(int)) > 0){
-            if(read(fd[0], str, sizeof(char) * n) > 0){
-                char *token = strtok(str, " ");
-                while (token != NULL) {
-                    insert_hash_table(table, token);
-                    token = strtok(NULL, " ");
-                }
-
-                // printf("Received: %s\n", str);
+    for (int s = 0; s < numOfSplitters; s++) {  // Splitters
+        for (int b = 0; b < numOfBuilders; b++) {   // Builders
+            if (pipe(pipes[s][b]) == -1) {
+                printf("Pipe creation failed\n");
+                return 1;
             }
         }
-
-        close(fd[0]);
-        wait(NULL);
-        print_hash_table(table);
     }
     
-    
+    //////// Create arrays to hold process ids of builders & splitters ////////
+    int pidsBuilders[numOfBuilders];
+    int pidsSplitter[numOfSplitters];
+
+
+
+    //////// FORK SPLITTERS ////////
+
+    for (int i = 0; i < numOfSplitters; i++){
+        pidsSplitter[i] = fork();
+        if (pidsSplitter[i] == -1){
+            printf("Error with creating splitter process\n");
+            return 2;
+        }
+
+        if (pidsSplitter[i] == 0){
+            // Child process
+            for (int s = 0; s < numOfSplitters; s++){
+                for (int b = 0; b < numOfBuilders; b++) {
+                    if (s == i){
+                        close(pipes[s][b][0]); // Close read ends for this splitter
+                        // Write ends (pipes[s][b][1]) remain open
+                    } else {
+                        close(pipes[s][b][0]); // Close all read ends for other splitters
+                        close(pipes[s][b][1]); // Close all write ends for other splitters
+                    }
+                }
+            }
+
+            // TEST LOGIC HERE
+
+            // const char *data = "word"; // Example data
+            // for (int b = 0; b < numOfBuilders; b++) {
+            //     write(pipes[i][b][1], data, strlen(data) + 1); // Send data to builder
+            // }
+            
+            // Close all write ends after writing
+            for (int b = 0; b < numOfBuilders; b++) {
+                close(pipes[i][b][1]);
+            }
+
+            return 0;   // Since the process exits here, the for loop isn't executed by the child processes
+            // break; if you want to continute after the for loop
+        }
+
+    }
+
+
+    //////// FORK BUILDERS ////////
+
+    for (int i = 0; i < numOfBuilders; i++){
+        pidsBuilders[i] = fork();
+        if (pidsBuilders[i] == -1){
+            printf("Error with creating builder process\n");
+            return 2;
+        }
+
+        if (pidsBuilders[i] == 0){
+            // Child process
+            // Close pipes
+            for (int s = 0; s < numOfSplitters; s++){
+                for (int b = 0; b < numOfBuilders; b++) {
+                    if (s == i){
+                        close(pipes[s][b][1]); // Close write ends for this splitter
+                        // Read ends (pipes[s][b][0]) remain open
+                    } else {
+                        close(pipes[s][b][0]); // Close all read ends for other splitters
+                        close(pipes[s][b][1]); // Close all write ends for other splitters
+                    }
+                }
+            }
+
+            // TEST LOGIC HERE
+
+            // char buffer[256]; // Buffer for reading data
+            // for (int s = 0; s < numOfSplitters; s++) {
+            //     if (read(pipes[s][i][0], buffer, sizeof(buffer)) > 0) {
+            //         printf("Builder %d received: %s\n", i, buffer);
+            //     }
+            // }
+
+            // Close all read ends after reading
+            for (int s = 0; s < numOfSplitters; s++) {
+                close(pipes[s][i][0]);
+            }
+
+            return 0;   // Since the process exits here, the for loop isn't executed by the child processes
+            // break; if you want to continute after the for loop
+        }
+    }
+
+    // PARENT PROCESS
+
+    // Cloes all pipe ends
+    for (int i = 0; i < numOfSplitters; i++) {
+        for (int j = 0; j < numOfBuilders; j++) {
+            close(pipes[i][j][0]);
+            close(pipes[i][j][1]);
+        }
+    }
+
+    // Wait for all child processes to finish execution
+    for (int i = 0; i < numOfSplitters + numOfBuilders; i++) {
+        wait(NULL);
+    }
+
+    //////// PRINT COMMAND LINE ARGUMENTS ////////
+    // printf("Input File: %s\n", inputFile);
+    // printf("Number of Splitters: %d\n", numOfSplitters);
+    // printf("Number of Builders: %d\n", numOfBuilders);
+    // printf("Top-K Words: %d\n", topK);
+    // printf("Exclusion List File: %s\n", exclusionList);
+    // printf("Output File: %s\n", outputFile);
+
+ 
+
     return 0;
 }
