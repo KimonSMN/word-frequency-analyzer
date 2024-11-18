@@ -7,6 +7,8 @@
 #include <fcntl.h>
 #include <signal.h>
 
+#include "hashtable.h"
+
 void trim_newline(char *str) {
     size_t len = strlen(str);
     if (len > 0 && (str[len - 1] == '\n' || str[len - 1] == '\r')) {
@@ -28,7 +30,7 @@ void clean_text(char *str) {
 }
 
 
-void splitter(int splitterIndex, int numOfSplitters, int numOfBuilders, char *inputFile, int inputFileLines ,int pipes[][2]){
+void splitter(struct hash_table *table, int splitterIndex, int numOfSplitters, int numOfBuilders, char *inputFile, int inputFileLines ,int pipes[][2]){
 
     FILE *file = fopen(inputFile, "r");
 
@@ -50,14 +52,21 @@ void splitter(int splitterIndex, int numOfSplitters, int numOfBuilders, char *in
     }
 
     // Process lines in the range [sectionFrom, sectionTo)
-
+    char* token;
+    char* delim = " "; 
+    
     for(int i = sectionFrom; i < sectionTo; i++){
         // logic
-        size_t len = 0;
-        char *line = NULL;
+
         getline(&line, &len, file);
         clean_text(line);
-        printf("%s\n", line);
+        token = strtok(line, delim);
+
+        while (token) {
+            insert_hash_table(table, token);
+            token = strtok(NULL, delim);
+        }
+        // printf("%s\n", line);
 
     }
 
@@ -69,6 +78,8 @@ int main() {
     char *inputFile = "numbers.txt"; // Example input file
     int numOfSplitters = 4;       // Number of splitters
     int numOfBuilders = 3;        // Example builders count (not used in this test)
+
+    struct hash_table *table = create_hash_table(100);
 
     // Count the total lines in the file
     int inputFileLines = 17;
@@ -90,8 +101,9 @@ int main() {
     // Test each splitter
     for (int i = 0; i < numOfSplitters; i++) {
         printf("\n--- Splitter %d Output ---\n", i);
-        splitter(i, numOfSplitters, numOfBuilders, inputFile, inputFileLines, pipes);
+        splitter(table, i, numOfSplitters, numOfBuilders, inputFile, inputFileLines, pipes);
     }
 
+    print_hash_table(table);
     return 0;
 }

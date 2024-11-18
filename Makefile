@@ -7,10 +7,10 @@ CC = gcc
 CFLAGS = 
 
 # Output executable name
-TARGET = lexan
+TARGET = splitter
 
 # Source files
-SRC = lexan.c hashtable.c
+SRC = splitter.c hashtable.c
 
 HEADERS = hashtable.h
 
