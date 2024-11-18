@@ -20,6 +20,7 @@ void trim_newline(char *str) {
 }
 
 void clean_text(char *str) {
+    
     size_t len = strlen(str);
     int j = 0; // Index for the updated string
 
@@ -30,6 +31,8 @@ void clean_text(char *str) {
     }
     str[j] = '\0';
 }
+
+
 
 int main(int argc, char* argv[]) {
 

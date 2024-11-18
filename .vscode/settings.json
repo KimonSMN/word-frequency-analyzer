@@ -4,6 +4,11 @@
     "type_traits": "cpp",
     "hashtable.h": "c",
     "vector": "c",
-    "random": "c"
+    "random": "c",
+    "time.h": "c",
+    "string.h": "c",
+    "stdio.h": "c",
+    "unistd.h": "c",
+    "fcntl.h": "c"
   }
 }
