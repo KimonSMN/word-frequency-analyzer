@@ -3,6 +3,7 @@
     "wait.h": "c",
     "type_traits": "cpp",
     "hashtable.h": "c",
-    "vector": "c"
+    "vector": "c",
+    "random": "c"
   }
 }

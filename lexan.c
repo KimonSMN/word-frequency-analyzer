@@ -19,9 +19,21 @@ void trim_newline(char *str) {
     }
 }
 
+void clean_text(char *str) {
+    size_t len = strlen(str);
+    int j = 0; // Index for the updated string
+
+    for (int i = 0; i < len; i++) {
+        if((str[i] >= 65 && str[i] <= 90 || str[i] >= 97 && str[i] <= 122 || str[i] == ' ')) {
+            str[j++] = str[i]; // Copy it to the new position
+        }
+    }
+    str[j] = '\0';
+}
+
 int main(int argc, char* argv[]) {
 
-    struct hash_table *table = create_hash_table(200);
+    struct hash_table *table = create_hash_table(300);
 
     int fd[2]; // fd[0] => read, fd[1] => write
     if (pipe(fd) == -1) return 1;
@@ -44,12 +56,12 @@ int main(int argc, char* argv[]) {
         // str[strlen(str) - 1] = '\0';
 
         char line[MAX_LEN];
-        printf("Test");
         while(fgets(line, MAX_LEN, file)){
             trim_newline(line);
-
+            clean_text(line);
+            printf("%s\n",line);
             int n = strlen(line) + 1;
-            if(write(fd[1], &n, sizeof(int)) < 0){
+            if(write(fd[1], &n, sizeof(int)) < 0){ //send the number of characters through the pipe
                 fclose(file);
                 close(fd[1]);
                 return 4;
@@ -65,12 +77,17 @@ int main(int argc, char* argv[]) {
     } else { // parent process 
         // will read and process the words
         close(fd[1]); // we don't write here  
-        char str[MAX_LEN];
-        int n;
+        char str[MAX_LEN]; 
+        int n;  // number of characters
 
         while(read(fd[0], &n, sizeof(int)) > 0){
             if(read(fd[0], str, sizeof(char) * n) > 0){
-                insert_hash_table(table, str);
+                char *token = strtok(str, " ");
+                while (token != NULL) {
+                    insert_hash_table(table, token);
+                    token = strtok(NULL, " ");
+                }
+
                 // printf("Received: %s\n", str);
             }
         }
@@ -79,6 +96,7 @@ int main(int argc, char* argv[]) {
         wait(NULL);
         print_hash_table(table);
     }
+    
     
     return 0;
 }
