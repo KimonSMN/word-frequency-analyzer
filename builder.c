@@ -6,7 +6,30 @@
 #include <sys/wait.h>
 #include <fcntl.h>
 #include <signal.h>
+#include <errno.h>
 
+ssize_t safe_read(int fd, void *buf, size_t count) {
+    size_t totalBytesRead = 0;
+    char *buffer = (char *)buf;
+
+    while (totalBytesRead < count) {
+        ssize_t bytesRead = read(fd, buffer + totalBytesRead, count - totalBytesRead);
+        if (bytesRead > 0) {
+            totalBytesRead += bytesRead;
+        } else if (bytesRead == 0) {
+            // EOF reached
+            break;
+        } else if (errno == EINTR) {
+            // Interrupted by signal, retry read
+            continue;
+        } else {
+            // Other error occurred
+            return -1;
+        }
+    }
+
+    return totalBytesRead;
+}
 
 void builder(int builderIndex, int numOfSplitters, int numOfBuilders, int splitterToBuilder[numOfSplitters][numOfBuilders][2]) {
 

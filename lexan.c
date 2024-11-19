@@ -7,6 +7,7 @@
 #include <fcntl.h>
 #include <signal.h>
 
+#include <arpa/inet.h> // For htonl and ntohl
 
 #include "splitter.h"
 #include "builder.h"
@@ -43,28 +44,22 @@ int main(int argc, char *argv[]) {
     }
 
     //////// CREATE PIPES ////////
-    int splitterToBuilder[numOfSplitters][numOfBuilders][2];    // pipe[0] => read, 
-    int builderToParent[numOfSplitters][2];                      // pipe[1] => write
+    // pipe[0] => read, 
+    // pipe[1] => write
 
-    for (int s = 0; s < numOfSplitters; s++) {  // Splitters
-        for (int b = 0; b < numOfBuilders; b++) {   // Builders
-            if (pipe(splitterToBuilder[s][b]) == -1) {
-                printf("Splitter pipe creation failed\n");
-                return 1;
-            }
-        }
-    }
+    
+    int builderPipes[numOfBuilders][2]; // [][0] for reading by builders, [][1] for writing by splitters
 
-    for (int b = 0; b < numOfBuilders; b++) {   // Builders
-        if (pipe(builderToParent[numOfBuilders]) == -1 ){
-            printf("Builder pipe creation failed\n");
-            return 1;
+    // Create one pipe per builder
+    for (int b = 0; b < numOfBuilders; b++) {
+        if (pipe(builderPipes[b]) == -1) {
+            perror("Pipe creation failed");
+            exit(1);
         }
     }
 
     //////// FORK SPLITTERS ////////
 
-    int builderIndex;
     for (int s = 0; s < numOfSplitters; s++) {
         int pid = fork();
         if (pid == -1) {
@@ -73,78 +68,34 @@ int main(int argc, char *argv[]) {
         }
 
         if (pid == 0) { // Child process (splitter)
-            // Close unused pipes for this splitter
-            for (int otherSplitter = 0; otherSplitter < numOfSplitters; otherSplitter++) {
-                for (int b = 0; b < numOfBuilders; b++) {
-                    if (otherSplitter != s) {
-                        close(splitterToBuilder[otherSplitter][b][0]); // Close read ends
-                        close(splitterToBuilder[otherSplitter][b][1]); // Close write ends
-                    }
-                }
+            for(int b = 0;b < numOfBuilders; b++){
+                close(builderPipes[b][0]);  // Close read ends of each builder pipe
             }
 
-            for (int b = 0; b < numOfBuilders; b++) {
-                close(splitterToBuilder[s][b][0]); // Close read ends
-            }
+            // ADD LOGIC HERE
 
-            FILE *file = fopen(inputFile, "r");
 
-            int sectionFrom = s * (8 / numOfSplitters); // splitter_2 * (1000 lines / 4) => 2 * 250 => 500 
-            int sectionTo = sectionFrom + (8 / numOfSplitters);     // 500 + (1000/4) => 750
-            if (s == numOfSplitters - 1) {
-                sectionTo = 8; // Ensure the last splitter gets all remaining lines
-            }
+            for (int i = 3; i < 6; i++) {
+                int builderIndex = i % numOfBuilders; // Determine which builder to send to
 
-            // Skip lines until sectionFrom
-            size_t len = 0;
-            char *line = NULL;
-            for (int currentLine = 0; currentLine < sectionFrom; currentLine++) {
-                if (getline(&line, &len, file) == -1) {
-                    perror("Error skipping lines");
-                    fclose(file);
+                // Convert integer to network byte order for consistent endianness
+                int value = htonl(i);
+
+                // Write the integer to the appropriate builder's pipe
+                ssize_t n = write(builderPipes[builderIndex][1], &value, sizeof(value));
+                if (n != sizeof(value)) {
+                    perror("write");
                     exit(1);
                 }
+
+                printf("Splitter %d sent value %d to Builder %d\n", s, i, builderIndex);
             }
 
-            // Process lines from sectionFrom to sectionTo
-            char* token;
-            char *delim = " \t\n";
-            
-            for(int i = sectionFrom; i < sectionTo; i++){
-                // logic
-                getline(&line, &len, file);
-                clean_text(line);
-                trim_newline(line);
-                token = strtok(line, delim);
-
-                while (token) {
-                    // insert_hash_table(table, token);
-                    // printf("Token: %s\n", token);
-                    unsigned long bucketForWord = hash(token, 100);
-                    int builderIndex = bucketForWord % numOfBuilders;
-                    // printf("Splitter %d sends '%s' to Builder %d\n", s, token, builderIndex);
-
-                    // Send Word to builder
-                    int n = strlen(token) + 1;
-                    if (write(splitterToBuilder[s][builderIndex][1], &n, sizeof(int)) < 0) {
-                        perror("Error writing n to pipe");
-                    }
-
-                    printf("Splitter %d writes '%s' to Builder %d\n", s, token, builderIndex);
-                    if (write(splitterToBuilder[s][builderIndex][1], token, sizeof(char) * n) < 0) {
-                        perror("Error writing to pipe");
-                    }
-                    token = strtok(NULL, delim);
-                }
-            }
-
+            // Close write ends before exiting
             for (int b = 0; b < numOfBuilders; b++) {
-                close(splitterToBuilder[s][b][1]); // Close write ends
+                close(builderPipes[b][1]); // Close write ends
             }
-            printf("Splitter %d finished sending and closed pipes\n", s);
 
-            free(line);
-            fclose(file);
 
             // Exit after processing
             return 1;
@@ -160,68 +111,67 @@ int main(int argc, char *argv[]) {
             return 2;
         }
 
-        if (pid == 0) { // Child process (builder)
-            
-            for (int s = 0; s < numOfSplitters; s++) {
-                close(splitterToBuilder[s][builderIndex][1]); // Close write ends
+        if (pid == 0) { // Child process
+
+            // Close unnecessary pipe ends
+            // for (int i = 0; i < numOfBuilders; i++) {
+            //     if (i != b) {
+            //         close(builderPipes[i][0]); // Close read end of other builders
+            //         close(builderPipes[i][1]); // Close write end of other builders
+            //     }
+            // }
+
+            // close(builderPipes[b][1]);    // Close write end of own pipe
+
+
+            // ADD LOGIC HERE
+
+            for (int i = 0; i < numOfBuilders; i++) {
+                close(builderPipes[i][1]); // Close write ends
+                if (i != b) {
+                    close(builderPipes[i][0]); // Close read ends of other builders
+                }
             }
 
-            printf("Builder %d is reading from pipes...\n", builderIndex);
-
-            for (int s = 0; s < numOfSplitters; s++) {
-                while(1){
-                    int n; 
-                    char str[200];
-                    size_t bytes;
-
-                    bytes = read(splitterToBuilder[s][builderIndex][0], &n, sizeof(int));
-                    if(bytes == -1){
-                        return 1;
-                    } else if (bytes == 0){
-                        // EOF
-                        printf("Reached EOF LENGTH\n");
-                        break;
-                    }
-
-                    // printf("Length %d ", n);
-                    bytes = read(splitterToBuilder[s][builderIndex][0], str, sizeof(char) * n);
-                    if(bytes == -1){
-                        return 1;
-                    } else if (bytes == 0){
-                        // EOF
-                        printf("Reached EOF STRING\n");
-                        break;
-                    }
-
-                    // printf("Word %s\n", str);
-
-                    printf("Builder %d received: %s From Splitter: %d\n ", builderIndex, str, s);
-                
+            // Read integers from the pipe
+            int value;
+            ssize_t n;
+            while ((n = read(builderPipes[b][0], &value, sizeof(value))) > 0) {
+                if (n != sizeof(value)) {
+                    fprintf(stderr, "Partial read\n");
+                    exit(1);
                 }
 
-                close(splitterToBuilder[s][builderIndex][0]);   // Close the read end
+                // Convert from network byte order to host byte order
+                value = ntohl(value);
 
+                printf("Builder %d received value %d\n", b, value);
             }
+
+            if (n == -1) {
+                perror("read");
+                exit(1);
+            }
+
+            // Close read end before exiting
+            close(builderPipes[b][0]);
+
 
             // Exit after processing
             return 1;
         }
-        printf("Builder %d finished reading.\n", builderIndex);
 
     }
 
 
     // PARENT PROCESS
 
-
-
     // Cloes all pipe ends
-    for (int s = 0; s < numOfSplitters; s++) {
-        for (int b = 0; b < numOfBuilders; b++) {
-            close(splitterToBuilder[s][b][0]);
-            close(splitterToBuilder[s][b][1]);
-        }
+    for (int b = 0; b < numOfBuilders; b++) {
+        close(builderPipes[b][0]);
+        close(builderPipes[b][1]);
     }
+    
 
     // Wait for all child processes to finish execution
     for (int i = 0; i < numOfSplitters + numOfBuilders; i++) {

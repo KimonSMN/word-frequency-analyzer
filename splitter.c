@@ -30,10 +30,10 @@ void clean_text(char *str) {
 }
 
 
-void splitter(int splitterIndex, int numOfSplitters, int numOfBuilders, char *inputFile, int inputFileLines, int splitterToBuilder[numOfSplitters][numOfBuilders][2]){
+void splitter(int splitterIndex, int numOfSplitters, int numOfBuilders, char *inputFile, int inputFileLines, int builderPipes[numOfBuilders][2]){
 
     for (int b = 0; b < numOfBuilders; b++) {
-        close(splitterToBuilder[splitterIndex][b][0]); // Close read ends
+        close(builderPipes[b][0]); // Close read end
     }
 
     FILE *file = fopen(inputFile, "r");
@@ -75,12 +75,12 @@ void splitter(int splitterIndex, int numOfSplitters, int numOfBuilders, char *in
 
             // Send Word to builder
             int n = strlen(token) + 1;
-            if (write(splitterToBuilder[splitterIndex][builderIndex][1], &n, sizeof(int)) < 0) {
+            if (write(builderPipes[builderIndex][1], &n, sizeof(int)) < 0) {
                 perror("Error writing n to pipe");
             }
 
             printf("Splitter %d writes '%s' to Builder %d\n", splitterIndex, token, builderIndex);
-            if (write(splitterToBuilder[splitterIndex][builderIndex][1], token, sizeof(char) * n) < 0) {
+            if (write(builderPipes[builderIndex][1], token, sizeof(char) * n) < 0) {
                 perror("Error writing to pipe");
             }
             token = strtok(NULL, delim);
@@ -88,7 +88,7 @@ void splitter(int splitterIndex, int numOfSplitters, int numOfBuilders, char *in
     }
 
     for (int b = 0; b < numOfBuilders; b++) {
-        close(splitterToBuilder[splitterIndex][b][1]); // Close write ends
+        close(builderPipes[b][1]); // Close write ends
     }
     printf("Splitter %d finished sending and closed pipes\n", splitterIndex);
 
