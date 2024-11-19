@@ -1,6 +1,6 @@
 #ifndef BUILDER_H
 #define BUILDER_H
 
-void builder(int builderIndex, int numOfSplitters, int numOfBuilders, int pipes[numOfSplitters][numOfBuilders][2]);
+void builder(int builderIndex, int numOfSplitters, int numOfBuilders, int splitterToBuilder[numOfSplitters][numOfBuilders][2]);
 
 #endif

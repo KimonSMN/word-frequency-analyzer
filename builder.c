@@ -8,33 +8,40 @@
 #include <signal.h>
 
 
-void builder(int builderIndex, int numOfSplitters, int numOfBuilders, int pipes[numOfSplitters][numOfBuilders][2]) {
+void builder(int builderIndex, int numOfSplitters, int numOfBuilders, int splitterToBuilder[numOfSplitters][numOfBuilders][2]) {
 
     for (int s = 0; s < numOfSplitters; s++) {
-        close(pipes[s][numOfBuilders][1]); // Close write ends
+        close(splitterToBuilder[s][builderIndex][1]); // Close write ends
     }
 
     printf("Builder %d is reading from pipes...\n", builderIndex);
 
-    // Read from all splitters
     for (int s = 0; s < numOfSplitters; s++) {
-        while (1) {
-
+        while(1){
             int n; 
             char str[200];
-            if(read(pipes[s][builderIndex][0], &n, sizeof(int)) <= 0){
-                break;
-            }
-            if(read(pipes[s][builderIndex][0], str, sizeof(char) * n) <= 0){
-                break;
-            }
-        
-            printf("Builder %d received: %s\n", builderIndex, str);
-        
+            size_t bytes;
 
+            read(splitterToBuilder[s][builderIndex][0], &n, sizeof(int));
+ 
+            // printf("Length %d ", n);
+            bytes = read(splitterToBuilder[s][builderIndex][0], str, sizeof(char) * n);
+            if(bytes < 0){
+                exit(1);
+            } else if (bytes == 0){
+                // EOF
+                printf("Reached EOF\n");
+                break;
+            }
+
+            // printf("Word %s\n", str);
+
+            printf("Builder %d received: %s From Splitter: %d\n ", builderIndex, str, s);
+        
         }
-        // Close the read end for the current splitter
-        close(pipes[s][builderIndex][0]);
+
+        close(splitterToBuilder[s][builderIndex][0]);   // Close the read end
+
     }
 
     printf("Builder %d finished reading.\n", builderIndex);
