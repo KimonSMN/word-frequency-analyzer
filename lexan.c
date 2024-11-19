@@ -163,8 +163,8 @@ int main(int argc, char *argv[]) {
         if (pid == 0) { // Child process (builder)
             
             for (int s = 0; s < numOfSplitters; s++) {
-                    close(splitterToBuilder[s][builderIndex][1]); // Close write ends
-                }
+                close(splitterToBuilder[s][builderIndex][1]); // Close write ends
+            }
 
             printf("Builder %d is reading from pipes...\n", builderIndex);
 
@@ -174,15 +174,22 @@ int main(int argc, char *argv[]) {
                     char str[200];
                     size_t bytes;
 
-                    read(splitterToBuilder[s][builderIndex][0], &n, sizeof(int));
-        
+                    bytes = read(splitterToBuilder[s][builderIndex][0], &n, sizeof(int));
+                    if(bytes == -1){
+                        return 1;
+                    } else if (bytes == 0){
+                        // EOF
+                        printf("Reached EOF LENGTH\n");
+                        break;
+                    }
+
                     // printf("Length %d ", n);
                     bytes = read(splitterToBuilder[s][builderIndex][0], str, sizeof(char) * n);
                     if(bytes == -1){
                         return 1;
                     } else if (bytes == 0){
                         // EOF
-                        printf("Reached EOF\n");
+                        printf("Reached EOF STRING\n");
                         break;
                     }
 
@@ -196,10 +203,11 @@ int main(int argc, char *argv[]) {
 
             }
 
-            printf("Builder %d finished reading.\n", builderIndex);
             // Exit after processing
             return 1;
         }
+        printf("Builder %d finished reading.\n", builderIndex);
+
     }
 
 
@@ -221,7 +229,6 @@ int main(int argc, char *argv[]) {
     }
 
 
-    fclose(inputFile);
 
     return 0;
 }
