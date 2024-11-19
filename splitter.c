@@ -32,9 +32,16 @@ void clean_text(char *str) {
 
 void splitter(int splitterIndex, int numOfSplitters, int numOfBuilders, char *inputFile, int inputFileLines, int builderPipes[numOfBuilders][2]){
 
+
+    // Initialize buffers for each builder
+    char **builderBuffers = malloc(numOfBuilders * sizeof(char *));
+    size_t *builderBufferSizes = malloc(numOfBuilders * sizeof(size_t));
+
     for (int b = 0; b < numOfBuilders; b++) {
-        close(builderPipes[b][0]); // Close read end
+        builderBuffers[b] = NULL;
+        builderBufferSizes[b] = 0;
     }
+
 
     FILE *file = fopen(inputFile, "r");
 
@@ -59,38 +66,79 @@ void splitter(int splitterIndex, int numOfSplitters, int numOfBuilders, char *in
     char* token;
     char *delim = " \t\n";
     
-    for(int i = sectionFrom; i < sectionTo; i++){
-        // logic
-        getline(&line, &len, file);
+    for (int i = sectionFrom; i < sectionTo; i++) {
+        if (getline(&line, &len, file) == -1) {
+            perror("Error reading line");
+            fclose(file);
+            exit(1);
+        }
+
         clean_text(line);
         trim_newline(line);
         token = strtok(line, delim);
 
         while (token) {
-            // insert_hash_table(table, token);
-            // printf("Token: %s\n", token);
+            // Hash the word to get the builder index
             unsigned long bucketForWord = hash(token, 100);
             int builderIndex = bucketForWord % numOfBuilders;
-            // printf("Splitter %d sends '%s' to Builder %d\n", splitterIndex, token, builderIndex);
 
-            // Send Word to builder
-            int n = strlen(token) + 1;
-            if (write(builderPipes[builderIndex][1], &n, sizeof(int)) < 0) {
-                perror("Error writing n to pipe");
+            // Append the word to the builder's buffer
+            size_t wordLen = strlen(token);
+            size_t newSize = builderBufferSizes[builderIndex] + wordLen + 1; // +1 for space or null terminator
+
+            char *temp = realloc(builderBuffers[builderIndex], newSize);
+            if (temp == NULL) {
+                perror("Realloc failed");
+                exit(1);
+            }
+            builderBuffers[builderIndex] = temp;
+
+            // Append the word and a space (or newline)
+            if (builderBufferSizes[builderIndex] == 0) {
+                // First word, no need for space
+                strcpy(builderBuffers[builderIndex], token);
+            } else {
+                strcat(builderBuffers[builderIndex], " ");
+                strcat(builderBuffers[builderIndex], token);
             }
 
-            printf("Splitter %d writes '%s' to Builder %d\n", splitterIndex, token, builderIndex);
-            if (write(builderPipes[builderIndex][1], token, sizeof(char) * n) < 0) {
-                perror("Error writing to pipe");
-            }
+            builderBufferSizes[builderIndex] = newSize - 1; // Exclude null terminator for size
+
+            printf("Splitter %d queues '%s' for Builder %d\n", splitterIndex, token, builderIndex);
+
             token = strtok(NULL, delim);
         }
     }
 
+    // Send merged words to each builder
     for (int b = 0; b < numOfBuilders; b++) {
-        close(builderPipes[b][1]); // Close write ends
+        if (builderBuffers[b] != NULL && builderBufferSizes[b] > 0) {
+            // Send the size of the buffer first
+            int n = builderBufferSizes[b] + 1; // Include null terminator
+            if (write(builderPipes[b][1], &n, sizeof(int)) < 0) {
+                perror("Error writing size to pipe");
+            }
+
+            // Send the buffer
+            if (write(builderPipes[b][1], builderBuffers[b], n) < 0) {
+                perror("Error writing buffer to pipe");
+            }
+
+            printf("Splitter %d sends merged words to Builder %d\n", splitterIndex, b);
+        }
     }
-    printf("Splitter %d finished sending and closed pipes\n", splitterIndex);
+
+
+    // for (int b = 0; b < numOfBuilders; b++) {
+    //     close(builderPipes[b][1]); // Close write ends
+    // }
+
+    // Free allocated memory
+    for (int b = 0; b < numOfBuilders; b++) {
+        free(builderBuffers[b]);
+    }
+    free(builderBuffers);
+    free(builderBufferSizes);
 
     free(line);
     fclose(file);

@@ -75,27 +75,13 @@ int main(int argc, char *argv[]) {
             // ADD LOGIC HERE
 
 
-            for (int i = 3; i < 6; i++) {
-                int builderIndex = i % numOfBuilders; // Determine which builder to send to
+            splitter(s, numOfSplitters, numOfBuilders, inputFile, 8, builderPipes);
 
-                // Convert integer to network byte order for consistent endianness
-                int value = htonl(i);
-
-                // Write the integer to the appropriate builder's pipe
-                ssize_t n = write(builderPipes[builderIndex][1], &value, sizeof(value));
-                if (n != sizeof(value)) {
-                    perror("write");
-                    exit(1);
-                }
-
-                printf("Splitter %d sent value %d to Builder %d\n", s, i, builderIndex);
-            }
 
             // Close write ends before exiting
             for (int b = 0; b < numOfBuilders; b++) {
                 close(builderPipes[b][1]); // Close write ends
             }
-
 
             // Exit after processing
             return 1;
@@ -133,29 +119,12 @@ int main(int argc, char *argv[]) {
                 }
             }
 
-            // Read integers from the pipe
-            int value;
-            ssize_t n;
-            while ((n = read(builderPipes[b][0], &value, sizeof(value))) > 0) {
-                if (n != sizeof(value)) {
-                    fprintf(stderr, "Partial read\n");
-                    exit(1);
-                }
+            
+            builder(b, numOfSplitters, numOfBuilders, builderPipes);
 
-                // Convert from network byte order to host byte order
-                value = ntohl(value);
-
-                printf("Builder %d received value %d\n", b, value);
-            }
-
-            if (n == -1) {
-                perror("read");
-                exit(1);
-            }
 
             // Close read end before exiting
             close(builderPipes[b][0]);
-
 
             // Exit after processing
             return 1;

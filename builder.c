@@ -8,64 +8,58 @@
 #include <signal.h>
 #include <errno.h>
 
-ssize_t safe_read(int fd, void *buf, size_t count) {
-    size_t totalBytesRead = 0;
-    char *buffer = (char *)buf;
 
-    while (totalBytesRead < count) {
-        ssize_t bytesRead = read(fd, buffer + totalBytesRead, count - totalBytesRead);
-        if (bytesRead > 0) {
-            totalBytesRead += bytesRead;
-        } else if (bytesRead == 0) {
-            // EOF reached
+void builder(int builderIndex, int numOfSplitters, int numOfBuilders, int builderPipes[numOfBuilders][2]) {
+    // Read the size of the incoming data
+    // Initialize variables
+    char *buffer = NULL;
+    size_t bufferSize = 0;
+
+    while (1) {
+        // Read the size of the incoming data
+        int n;
+        ssize_t nbytes = read(builderPipes[builderIndex][0], &n, sizeof(int));
+
+        if (nbytes == 0) {
+            // EOF detected, no more data
             break;
-        } else if (errno == EINTR) {
-            // Interrupted by signal, retry read
-            continue;
-        } else {
-            // Other error occurred
-            return -1;
+        } else if (nbytes < 0) {
+            perror("Error reading size from pipe");
+            exit(1);
+        } else if (nbytes != sizeof(int)) {
+            fprintf(stderr, "Partial read of size\n");
+            exit(1);
+        }
+
+        // Allocate buffer to receive the data
+        buffer = realloc(buffer, n);
+        if (buffer == NULL) {
+            perror("Realloc failed");
+            exit(1);
+        }
+
+        // Read the buffer
+        nbytes = read(builderPipes[builderIndex][0], buffer, n);
+        if (nbytes != n) {
+            perror("Error reading buffer from pipe");
+            exit(1);
+        }
+
+        // Process the merged words
+        char *token;
+        char *delim = " \t\n";
+        token = strtok(buffer, delim);
+
+        while (token) {
+            // Process each word
+            printf("Builder %d processes word '%s'\n", builderIndex, token);
+
+            // ... (additional processing)
+
+            token = strtok(NULL, delim);
         }
     }
 
-    return totalBytesRead;
-}
-
-void builder(int builderIndex, int numOfSplitters, int numOfBuilders, int splitterToBuilder[numOfSplitters][numOfBuilders][2]) {
-
-    for (int s = 0; s < numOfSplitters; s++) {
-        close(splitterToBuilder[s][builderIndex][1]); // Close write ends
-    }
-
-    printf("Builder %d is reading from pipes...\n", builderIndex);
-
-    for (int s = 0; s < numOfSplitters; s++) {
-        while(1){
-            int n; 
-            char str[200];
-            size_t bytes;
-
-            read(splitterToBuilder[s][builderIndex][0], &n, sizeof(int));
- 
-            // printf("Length %d ", n);
-            bytes = read(splitterToBuilder[s][builderIndex][0], str, sizeof(char) * n);
-            if(bytes < 0){
-                exit(1);
-            } else if (bytes == 0){
-                // EOF
-                printf("Reached EOF\n");
-                break;
-            }
-
-            // printf("Word %s\n", str);
-
-            printf("Builder %d received: %s From Splitter: %d\n ", builderIndex, str, s);
-        
-        }
-
-        close(splitterToBuilder[s][builderIndex][0]);   // Close the read end
-
-    }
-
-    printf("Builder %d finished reading.\n", builderIndex);
+    // Free allocated memory
+    free(buffer);
 }
