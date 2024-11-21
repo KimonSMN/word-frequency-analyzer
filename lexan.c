@@ -76,14 +76,14 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
-    int current_line = 0;
+    int current_line = 1;
     int ch;  // Use int to accommodate EOF value
     while ((ch = fgetc(inputFile)) != EOF) {
         if (ch == '\n') {
             current_line++;
         }
     }
-    // If the last line doesn't end with a newline character
+
     // fseek(inputFile, 0, SEEK_END);
     // if (ftell(inputFile) > 0) {
     //     fseek(inputFile, -1, SEEK_END);
@@ -104,14 +104,7 @@ int main(int argc, char *argv[]) {
             exclusionFileLines++;
         }
     }
-    // // Handle last line not ending with a newline
-    // fseek(exclusionFile, 0, SEEK_END);
-    // if (ftell(exclusionFile) > 0) {
-    //     fseek(exclusionFile, -1, SEEK_END);
-    //     if (fgetc(exclusionFile) != '\n') {
-    //         exclusionFileLines++;
-    //     }
-    // }
+
     printf("EXCLUSION HAS %d LINES\n", exclusionFileLines);
 
     // Allocate memory for the exclusion list
