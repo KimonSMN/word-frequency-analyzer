@@ -6,6 +6,7 @@
 #include <sys/wait.h>
 #include <fcntl.h>
 #include <signal.h>
+#include <stdbool.h>
 
 #include "hashtable.h"
 
@@ -29,8 +30,18 @@ void clean_text(char *str) {
     str[j] = '\0';
 }
 
+bool isExcluded(char *word, char *exclusionList[], int exclusionListSize){
+    for (int i = 0; i < exclusionListSize; i++) {
+        if (strcmp(word, exclusionList[i]) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
 
-void splitter(int splitterIndex, int numOfSplitters, int numOfBuilders, char *inputFile, int inputFileLines, int builderPipes[numOfBuilders][2]){
+
+
+void splitter(int splitterIndex, int numOfSplitters, int numOfBuilders, char *inputFile, int inputFileLines, int builderPipes[numOfBuilders][2], int exclusionListSize ,char *exclusionList[]){
 
 
     // Initialize buffers for each builder
@@ -78,13 +89,27 @@ void splitter(int splitterIndex, int numOfSplitters, int numOfBuilders, char *in
         token = strtok(line, delim);
 
         while (token) {
+            if (isExcluded(token, exclusionList, exclusionListSize)) { // If token excluded skip to the next one
+                token = strtok(NULL, delim);
+                continue;   
+            }
+                    
             // Hash the word to get the builder index
             unsigned long bucketForWord = hash(token, 100);
             int builderIndex = bucketForWord % numOfBuilders;
 
-            // Append the word to the builder's buffer
-            size_t wordLen = strlen(token);
-            size_t newSize = builderBufferSizes[builderIndex] + wordLen + 1; // +1 for space or null terminator
+            
+            // Calculate new size
+            size_t oldSize = builderBufferSizes[builderIndex];
+            size_t tokenLen = strlen(token);
+            size_t newSize;
+
+            if (builderBufferSizes[builderIndex] == 0) {
+                // First word
+                newSize = oldSize + tokenLen + 1; // +1 for null terminator
+            } else {
+                newSize = oldSize + 1 + tokenLen + 1; // +1 for space, +1 for null terminator
+            }
 
             char *temp = realloc(builderBuffers[builderIndex], newSize);
             if (temp == NULL) {
@@ -97,12 +122,13 @@ void splitter(int splitterIndex, int numOfSplitters, int numOfBuilders, char *in
             if (builderBufferSizes[builderIndex] == 0) {
                 // First word, no need for space
                 strcpy(builderBuffers[builderIndex], token);
+                builderBufferSizes[builderIndex] = tokenLen;
+
             } else {
                 strcat(builderBuffers[builderIndex], " ");
                 strcat(builderBuffers[builderIndex], token);
+                builderBufferSizes[builderIndex] = oldSize + 1 + tokenLen;
             }
-
-            builderBufferSizes[builderIndex] = newSize - 1; // Exclude null terminator for size
 
             printf("Splitter %d queues '%s' for Builder %d\n", splitterIndex, token, builderIndex);
 
@@ -127,11 +153,6 @@ void splitter(int splitterIndex, int numOfSplitters, int numOfBuilders, char *in
             printf("Splitter %d sends merged words to Builder %d\n", splitterIndex, b);
         }
     }
-
-
-    // for (int b = 0; b < numOfBuilders; b++) {
-    //     close(builderPipes[b][1]); // Close write ends
-    // }
 
     // Free allocated memory
     for (int b = 0; b < numOfBuilders; b++) {

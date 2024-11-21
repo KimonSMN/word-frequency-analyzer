@@ -8,12 +8,28 @@
 #include <signal.h>
 #include <errno.h>
 
+ssize_t safe_read(int fd, void *buffer, size_t count) {
+    size_t bytes_read = 0;
+    ssize_t result;
+    while (bytes_read < count) {
+        result = read(fd, (char *)buffer + bytes_read, count - bytes_read);
+        if (result < 0) {
+            if (errno == EINTR) continue;
+            return -1;
+        }
+        if (result == 0) break;
+        bytes_read += result;
+    }
+    return bytes_read;
+}
+
 
 void builder(int builderIndex, int numOfSplitters, int numOfBuilders, int builderPipes[numOfBuilders][2]) {
     // Read the size of the incoming data
     // Initialize variables
     char *buffer = NULL;
     size_t bufferSize = 0;
+    const int MAX_BUFFER_SIZE = 1024 * 1024; // 1 MB, adjust as needed
 
     while (1) {
         // Read the size of the incoming data
@@ -32,7 +48,7 @@ void builder(int builderIndex, int numOfSplitters, int numOfBuilders, int builde
         }
 
         // Allocate buffer to receive the data
-        buffer = realloc(buffer, n);
+        buffer = realloc(buffer, n); 
         if (buffer == NULL) {
             perror("Realloc failed");
             exit(1);
@@ -53,9 +69,6 @@ void builder(int builderIndex, int numOfSplitters, int numOfBuilders, int builde
         while (token) {
             // Process each word
             printf("Builder %d processes word '%s'\n", builderIndex, token);
-
-            // ... (additional processing)
-
             token = strtok(NULL, delim);
         }
     }
@@ -63,3 +76,5 @@ void builder(int builderIndex, int numOfSplitters, int numOfBuilders, int builde
     // Free allocated memory
     free(buffer);
 }
+
+

@@ -6,27 +6,53 @@
 #include <sys/wait.h>
 #include <fcntl.h>
 #include <signal.h>
+#include <ctype.h>
 
 #include <arpa/inet.h> // For htonl and ntohl
 
 #include "splitter.h"
 #include "builder.h"
 
+// Note: This function returns a pointer to a substring of the original string.
+// If the given string was allocated dynamically, the caller must not overwrite
+// that pointer with the returned value, since the original pointer must be
+// deallocated using the same allocator with which it was allocated.  The return
+// value must NOT be deallocated using free() etc.
+char *trimwhitespace(char *str)
+{
+    char *end;
+
+    // Trim leading space
+    while(isspace((unsigned char)*str)) str++;
+
+    if(*str == 0)  // All spaces?
+    return str;
+
+    // Trim trailing space
+    end = str + strlen(str) - 1;
+    while(end > str && isspace((unsigned char)*end)) end--;
+
+    // Write new null terminator character
+    end[1] = '\0';
+
+    return str;
+}
+
 int main(int argc, char *argv[]) {
 
     //////// HANDLE COMMAND LINE ARGUMENTS ////////
 
-    char *inputFile = NULL;
+    char *inputFileName = NULL;
     int numOfSplitters = 0;
     int numOfBuilders = 0;
     int topK = 0;
-    char *exclusionList = NULL;
+    char *exclusionFileName = NULL;
     char *outputFile = NULL;
 
     // Parse the arguments
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "-i") == 0) {
-            inputFile = argv[++i];
+            inputFileName = argv[++i];
         } else if (strcmp(argv[i], "-l") == 0) {
             numOfSplitters = atoi(argv[++i]);        // Number of Splitters initialized in the command line
         } else if (strcmp(argv[i], "-m") == 0) {
@@ -34,7 +60,7 @@ int main(int argc, char *argv[]) {
         } else if (strcmp(argv[i], "-t") == 0) {
             topK = atoi(argv[++i]);
         } else if (strcmp(argv[i], "-e") == 0) {
-            exclusionList = argv[++i];
+            exclusionFileName = argv[++i];
         } else if (strcmp(argv[i], "-o") == 0) {
             outputFile = argv[++i];
         } else {
@@ -42,6 +68,66 @@ int main(int argc, char *argv[]) {
             return 1;
         }
     }
+
+    //////// READ FILE LINES ////////
+    FILE *inputFile = fopen(inputFileName, "r");
+    if (inputFile == NULL) {
+        perror("Error opening input file");
+        exit(1);
+    }
+
+    int current_line = 0;
+    int ch;  // Use int to accommodate EOF value
+    while ((ch = fgetc(inputFile)) != EOF) {
+        if (ch == '\n') {
+            current_line++;
+        }
+    }
+    // If the last line doesn't end with a newline character
+    // fseek(inputFile, 0, SEEK_END);
+    // if (ftell(inputFile) > 0) {
+    //     fseek(inputFile, -1, SEEK_END);
+    //     if (fgetc(inputFile) != '\n') {
+    //         current_line++;
+    //     }
+    // }
+    printf("FILE HAS %d LINES\n", current_line);
+    fclose(inputFile);
+
+    //////// READ SIZE OF EXCLUSION FILE ////////
+    FILE *exclusionFile = fopen(exclusionFileName, "r");
+
+    int exclusionFileLines = 0;
+    // Reset ch for reuse
+    while ((ch = fgetc(exclusionFile)) != EOF) {
+        if (ch == '\n') {
+            exclusionFileLines++;
+        }
+    }
+    // // Handle last line not ending with a newline
+    // fseek(exclusionFile, 0, SEEK_END);
+    // if (ftell(exclusionFile) > 0) {
+    //     fseek(exclusionFile, -1, SEEK_END);
+    //     if (fgetc(exclusionFile) != '\n') {
+    //         exclusionFileLines++;
+    //     }
+    // }
+    printf("EXCLUSION HAS %d LINES\n", exclusionFileLines);
+
+    // Allocate memory for the exclusion list
+    char line[128];
+    char **exclusionList = malloc(exclusionFileLines * sizeof(char *));
+    int i = 0;
+
+    rewind(exclusionFile);
+
+    while (fgets(line, sizeof(line), exclusionFile)) {
+        line[strcspn(line, "\r\n")] = '\0';
+        trimwhitespace(line);
+        exclusionList[i] = strdup(line);
+        i++;
+    }
+    fclose(exclusionFile);
 
     //////// CREATE PIPES ////////
     // pipe[0] => read, 
@@ -74,9 +160,7 @@ int main(int argc, char *argv[]) {
 
             // ADD LOGIC HERE
 
-
-            splitter(s, numOfSplitters, numOfBuilders, inputFile, 8, builderPipes);
-
+            splitter(s, numOfSplitters, numOfBuilders, inputFileName, current_line, builderPipes, exclusionFileLines, exclusionList);
 
             // Close write ends before exiting
             for (int b = 0; b < numOfBuilders; b++) {
@@ -98,17 +182,6 @@ int main(int argc, char *argv[]) {
         }
 
         if (pid == 0) { // Child process
-
-            // Close unnecessary pipe ends
-            // for (int i = 0; i < numOfBuilders; i++) {
-            //     if (i != b) {
-            //         close(builderPipes[i][0]); // Close read end of other builders
-            //         close(builderPipes[i][1]); // Close write end of other builders
-            //     }
-            // }
-
-            // close(builderPipes[b][1]);    // Close write end of own pipe
-
 
             // ADD LOGIC HERE
 
