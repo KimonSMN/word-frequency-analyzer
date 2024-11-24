@@ -8,6 +8,7 @@
 #include <signal.h>
 #include <errno.h>
 
+#include "hashtable.h"
 
 void builder(int builderIndex, int numOfSplitters, int numOfBuilders, int builderPipes[numOfBuilders][2]) {
     // Read the size of the incoming data
@@ -62,6 +63,7 @@ void builder(int builderIndex, int numOfSplitters, int numOfBuilders, int builde
             printf("Builder %d processes word '%s'\n", builderIndex, token);
             
             // insert to hash table
+            insert_hash_table(table, token);
 
             token = strtok(NULL, delim);
         }
@@ -69,7 +71,7 @@ void builder(int builderIndex, int numOfSplitters, int numOfBuilders, int builde
 
     // send hash table to root
     // free hash table
-
+    print_hash_table(table);
     // Free allocated memory
     free(buffer);
 }
