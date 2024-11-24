@@ -7,6 +7,8 @@ six
 seven 
 eight  
 nine 
+nine
+nine
 ten
 eleven
 tweleve

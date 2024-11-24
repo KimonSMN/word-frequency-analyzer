@@ -15,6 +15,12 @@
     "streambuf": "c",
     "signal.h": "c",
     "stdlib.h": "c",
-    "inet.h": "c"
+    "inet.h": "c",
+    "optional": "c",
+    "system_error": "c",
+    "array": "c",
+    "functional": "c",
+    "tuple": "c",
+    "utility": "c"
   }
 }

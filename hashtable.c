@@ -20,32 +20,32 @@ struct hash_table *create_hash_table(int capacity){
     return table;
 }
 
-void insert_hash_table(struct hash_table *table, char *key) {
+void insert_hash_table(struct hash_table *table, char *word) {
 
-    unsigned long index = hash(key, table->capacity);
+    unsigned long index = hash(word, table->capacity);
 
     struct hash_node *node = table->array[index];
     while (node != NULL) {
-        if (strcmp(node->key, key) == 0) {
-            node->value++;
+        if (strcmp(node->word, word) == 0) {
+            node->count++;
             return;
         }
         node = node->next;
     }
 
     struct hash_node *new_node = malloc(sizeof(struct hash_node));
-    new_node->key = strdup(key);
-    new_node->value = 1;
+    new_node->word = strdup(word);
+    new_node->count = 1;
     new_node->next = table->array[index];
     table->array[index] = new_node;
 }
 
-struct hash_node *search_hash_table(struct hash_table *table, char *key){
-    unsigned long index = hash(key, table->capacity);
+struct hash_node *search_hash_table(struct hash_table *table, char *word){
+    unsigned long index = hash(word, table->capacity);
 
     struct hash_node *node_to_search = table->array[index];
     while (node_to_search != NULL){
-        if(strcmp(node_to_search->key, key) == 0){
+        if(strcmp(node_to_search->word, word) == 0){
             return node_to_search;
         }
         node_to_search = node_to_search->next;
@@ -60,7 +60,7 @@ void destroy_hash_table(struct hash_table *table){
         while (current_node != NULL) {
             struct hash_node *temp_node = current_node;
             current_node = current_node->next;
-            free(temp_node->key);
+            free(temp_node->word);
             free(temp_node);
         }
     }
@@ -78,7 +78,7 @@ void print_hash_table(struct hash_table *table) {
         }
 
         while (node != NULL) {
-            printf("\tWord: %s Frequency: %d\n", node->key, node->value);
+            printf("\tWord: %s Frequency: %d\n", node->word, node->count);
             
             node = node->next;
             

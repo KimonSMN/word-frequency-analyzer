@@ -1,0 +1,29 @@
+Builders Serialize the Hash Table Data:
+
+Convert each entry in the hash table into a standardized format.
+For example, for each word-count pair, you might send:
+    The length of the word (as an integer in network byte order).
+    The word itself (as a string of bytes).
+    The count (as an integer in network byte order).
+
+Send the Serialized Data Through a Pipe or Named Pipe:
+
+    Each builder will write its serialized data to a pipe that connects to the root process.
+    You can use either anonymous pipes (if the processes are related) or named pipes (FIFOs) if they are unrelated.
+
+Root Process Reads and Deserializes the Data:
+
+    The root process reads the data sent by each builder.
+    It deserializes the data, reconstructing the word-count pairs.
+    It then aggregates the counts, combining the data from all builders.
+
+Root Process Produces the Final Output:
+
+    After collecting and aggregating data from all builders, the root process can perform operations such as:
+        Sorting the words by frequency.
+        Selecting the top K words.
+        Writing the results to the output file.
+
+
+int prime_sizes[] = {53, 97, 193, 389, 769, 1543, 3079, 6151, 12289, 24593, 49157, 98317, 196613, 393241,
+	786433, 1572869, 3145739, 6291469, 12582917, 25165843, 50331653, 100663319, 201326611, 402653189, 805306457, 1610612741};

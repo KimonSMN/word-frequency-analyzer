@@ -8,25 +8,16 @@
 #include <signal.h>
 #include <errno.h>
 
-ssize_t safe_read(int fd, void *buffer, size_t count) {
-    size_t bytes_read = 0;
-    ssize_t result;
-    while (bytes_read < count) {
-        result = read(fd, (char *)buffer + bytes_read, count - bytes_read);
-        if (result < 0) {
-            if (errno == EINTR) continue;
-            return -1;
-        }
-        if (result == 0) break;
-        bytes_read += result;
-    }
-    return bytes_read;
-}
-
 
 void builder(int builderIndex, int numOfSplitters, int numOfBuilders, int builderPipes[numOfBuilders][2]) {
     // Read the size of the incoming data
     // Initialize variables
+
+    // Create hash table
+
+    struct hash_table *table = create_hash_table(3079); // maybe pass the lines of the file and split by the builders and get the size as  the capacity
+    
+
     char *buffer = NULL;
     size_t bufferSize = 0;
     const int MAX_BUFFER_SIZE = 1024 * 1024; // 1 MB, adjust as needed
@@ -69,9 +60,15 @@ void builder(int builderIndex, int numOfSplitters, int numOfBuilders, int builde
         while (token) {
             // Process each word
             printf("Builder %d processes word '%s'\n", builderIndex, token);
+            
+            // insert to hash table
+
             token = strtok(NULL, delim);
         }
     }
+
+    // send hash table to root
+    // free hash table
 
     // Free allocated memory
     free(buffer);
