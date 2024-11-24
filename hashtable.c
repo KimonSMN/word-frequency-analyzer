@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
+
 #include "hashtable.h"
 
 // Hash function
@@ -86,4 +88,25 @@ void print_hash_table(struct hash_table *table) {
     }
 }
 
+
+void send_hash_table_to_root(struct hash_table *table, int writeFd){
+    for (int i = 0; i < table->capacity; i++){
+        struct hash_node *node = table->array[i];
+        while(node != NULL){
+            // write length of word
+            // write word 
+            // write frequency
+            // node->word[strlen(node->word) - 1] = '\0'; unessecary words already good
+
+            int n = strlen(node->word) + 1;
+            write(writeFd ,&n, sizeof(int));
+
+            write(writeFd, node->word, sizeof(char) * n);
+
+            write(writeFd, &node->count, sizeof(int));
+
+            node = node->next;
+        }
+    }
+}
 

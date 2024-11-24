@@ -10,7 +10,7 @@
 
 #include "hashtable.h"
 
-void builder(int builderIndex, int numOfSplitters, int numOfBuilders, int builderPipes[numOfBuilders][2]) {
+void builder(int builderIndex, int numOfSplitters, int numOfBuilders, int builderPipes[numOfBuilders][2], int builderToRootPipes[builderIndex][2]) {
     // Read the size of the incoming data
     // Initialize variables
 
@@ -18,10 +18,10 @@ void builder(int builderIndex, int numOfSplitters, int numOfBuilders, int builde
 
     struct hash_table *table = create_hash_table(3079); // maybe pass the lines of the file and split by the builders and get the size as  the capacity
     
+    int writeFd = builderToRootPipes[builderIndex][1];
 
     char *buffer = NULL;
     size_t bufferSize = 0;
-    const int MAX_BUFFER_SIZE = 1024 * 1024; // 1 MB, adjust as needed
 
     while (1) {
         // Read the size of the incoming data
@@ -69,6 +69,7 @@ void builder(int builderIndex, int numOfSplitters, int numOfBuilders, int builde
         }
     }
 
+    send_hash_table_to_root(table, writeFd);
     // send hash table to root
     // free hash table
     print_hash_table(table);

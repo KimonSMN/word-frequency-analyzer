@@ -24,4 +24,6 @@ void destroy_hash_table(struct hash_table *table);
 
 void print_hash_table(struct hash_table *table);
 
+void send_hash_table_to_root(struct hash_table *table, int writeFd);
+
 #endif

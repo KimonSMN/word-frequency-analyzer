@@ -10,6 +10,8 @@ nine
 nine
 nine
 ten
+ten
+ten
 eleven
 tweleve
 thirteen

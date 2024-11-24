@@ -137,6 +137,19 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    // create builderToRootPipes
+
+    int builderToRootPipes[numOfBuilders][2]; // [][0] for reading by root, [][1] for writing by builders
+
+    // Create one pipe per builder
+    for (int b = 0; b < numOfBuilders; b++) {
+        if (pipe(builderToRootPipes[b]) == -1) {
+            perror("Pipe creation failed");
+            exit(1);
+        }
+    }
+
+
     //////// FORK SPLITTERS ////////
 
     for (int s = 0; s < numOfSplitters; s++) {
@@ -186,8 +199,20 @@ int main(int argc, char *argv[]) {
             }
 
             
-            builder(b, numOfSplitters, numOfBuilders, builderPipes);
+            builder(b, numOfSplitters, numOfBuilders, builderPipes, builderToRootPipes);
 
+
+            for (int b = 0; b < numOfBuilders; b++) {
+                int n;
+                char str[200];
+                int freq;
+                read(builderToRootPipes[b][0], &n, sizeof(int));
+
+                read(builderToRootPipes[b][0], str, sizeof(char) * n);
+
+                read(builderToRootPipes[b][0], &freq, sizeof(int));
+                printf("Recieved: %s, %d\n",str, freq);
+            }
 
             // Close read end before exiting
             close(builderPipes[b][0]);
@@ -205,6 +230,8 @@ int main(int argc, char *argv[]) {
     for (int b = 0; b < numOfBuilders; b++) {
         close(builderPipes[b][0]);
         close(builderPipes[b][1]);
+        close(builderToRootPipes[b][0]);
+        close(builderToRootPipes[b][1]);
     }
     
 
@@ -212,8 +239,6 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < numOfSplitters + numOfBuilders; i++) {
         wait(NULL);
     }
-
-
 
     return 0;
 }

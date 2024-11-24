@@ -3,6 +3,6 @@
 
 // #include "hashtable.h"
 
-void builder(int builderIndex, int numOfSplitters, int numOfBuilders, int builderPipes[numOfBuilders][2]);
+void builder(int builderIndex, int numOfSplitters, int numOfBuilders, int builderPipes[numOfBuilders][2], int builderToRootPipes[builderIndex][2]);
 
 #endif
