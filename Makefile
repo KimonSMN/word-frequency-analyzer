@@ -8,13 +8,13 @@ CFLAGS =
 TARGET = lexan
 
 # Source files
-SRC = lexan.c hashtable.c splitter.c builder.c
+SRC = lexan.c hashtable.c splitter.c builder.c helper.c
 
 # Object files (replace .c with .o)
 OBJ = $(SRC:.c=.o)
 
 # Header files
-HEADERS = hashtable.h splitter.h builder.h
+HEADERS = hashtable.h splitter.h builder.h helper.h
 
 # Build the target executable
 all: $(TARGET)

@@ -12,7 +12,7 @@
 
 #include "splitter.h"
 #include "builder.h"
-
+#include "helper.h"
 // Note: This function returns a pointer to a substring of the original string.
 // If the given string was allocated dynamically, the caller must not overwrite
 // that pointer with the returned value, since the original pointer must be
@@ -123,13 +123,10 @@ int main(int argc, char *argv[]) {
     fclose(exclusionFile);
 
     //////// CREATE PIPES ////////
-    // pipe[0] => read, 
-    // pipe[1] => write
-
-    
+ 
+    // Pipes for Splitters & Builders
     int builderPipes[numOfBuilders][2]; // [][0] for reading by builders, [][1] for writing by splitters
 
-    // Create one pipe per builder
     for (int b = 0; b < numOfBuilders; b++) {
         if (pipe(builderPipes[b]) == -1) {
             perror("Pipe creation failed");
@@ -137,11 +134,10 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    // create builderToRootPipes
+    // Pipes for Builders & Root
 
     int builderToRootPipes[numOfBuilders][2]; // [][0] for reading by root, [][1] for writing by builders
 
-    // Create one pipe per builder
     for (int b = 0; b < numOfBuilders; b++) {
         if (pipe(builderToRootPipes[b]) == -1) {
             perror("Pipe creation failed");
@@ -189,33 +185,25 @@ int main(int argc, char *argv[]) {
 
         if (pid == 0) { // Child process
 
-            // ADD LOGIC HERE
-
             for (int i = 0; i < numOfBuilders; i++) {
                 close(builderPipes[i][1]); // Close write ends
                 if (i != b) {
                     close(builderPipes[i][0]); // Close read ends of other builders
                 }
+                close(builderToRootPipes[i][0]); // Close read ends of builderToRootPipes
+                if (i != b) {
+                    close(builderToRootPipes[i][1]); // Close write ends of other builders
+                }
             }
 
+            // Now builder can use builderPipes[b][0] to read from splitters
+            // And builderToRootPipes[b][1] to write to root
             
-            builder(b, numOfSplitters, numOfBuilders, builderPipes, builderToRootPipes);
-
-
-            for (int b = 0; b < numOfBuilders; b++) {
-                int n;
-                char str[200];
-                int freq;
-                read(builderToRootPipes[b][0], &n, sizeof(int));
-
-                read(builderToRootPipes[b][0], str, sizeof(char) * n);
-
-                read(builderToRootPipes[b][0], &freq, sizeof(int));
-                printf("Recieved: %s, %d\n",str, freq);
-            }
+            builder(b, numOfBuilders, builderPipes, builderToRootPipes);
 
             // Close read end before exiting
             close(builderPipes[b][0]);
+            close(builderToRootPipes[b][1]);
 
             // Exit after processing
             return 1;
@@ -223,21 +211,57 @@ int main(int argc, char *argv[]) {
 
     }
 
-
-    // PARENT PROCESS
+    for (int b = 0; b < numOfBuilders; b++) {
+        close(builderToRootPipes[b][1]); // Close write ends in root
+    }   
 
     // Cloes all pipe ends
     for (int b = 0; b < numOfBuilders; b++) {
         close(builderPipes[b][0]);
         close(builderPipes[b][1]);
-        close(builderToRootPipes[b][0]);
-        close(builderToRootPipes[b][1]);
     }
     
 
-    // Wait for all child processes to finish execution
+    // wait for all child processes to finish execution
     for (int i = 0; i < numOfSplitters + numOfBuilders; i++) {
         wait(NULL);
+    }
+
+    // PARENT PROCESS
+
+    for (int b = 0; b < numOfBuilders; b++) {
+        close(builderToRootPipes[b][1]); // Close write ends in root
+
+        while(1){
+            int n;
+            char *buffer = malloc(n);
+            int freq;
+
+            ssize_t nbytes = read_nbytes(builderToRootPipes[b][0], &n, sizeof(int));
+            if(nbytes < 0){
+                return 1;
+            } else if(nbytes == 0){
+                //EOF
+                break;
+            }
+            if (n == 0) {
+                // End marker received
+                printf("Root: Received end marker from Builder %d\n", b);
+                break;
+            }
+            nbytes = read_nbytes(builderToRootPipes[b][0], buffer, sizeof(char) * n);
+            if(nbytes < 0){
+                return 1;
+            } 
+            nbytes = read_nbytes(builderToRootPipes[b][0], &freq, sizeof(int));
+            if(nbytes < 0){
+                return 1;
+            } 
+            printf("Received from Builder %d: %s, %d\n", b, buffer, freq);
+        }
+
+
+        close(builderToRootPipes[b][0]);
     }
 
     return 0;

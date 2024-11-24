@@ -9,19 +9,15 @@
 #include <errno.h>
 
 #include "hashtable.h"
+#include "helper.h"
 
-void builder(int builderIndex, int numOfSplitters, int numOfBuilders, int builderPipes[numOfBuilders][2], int builderToRootPipes[builderIndex][2]) {
-    // Read the size of the incoming data
-    // Initialize variables
+void builder(int builderIndex, int numOfBuilders, int builderPipes[numOfBuilders][2], int builderToRootPipes[numOfBuilders][2]) {
 
     // Create hash table
-
     struct hash_table *table = create_hash_table(3079); // maybe pass the lines of the file and split by the builders and get the size as  the capacity
     
-    int writeFd = builderToRootPipes[builderIndex][1];
-
+    // Initialize variables
     char *buffer = NULL;
-    size_t bufferSize = 0;
 
     while (1) {
         // Read the size of the incoming data
@@ -61,18 +57,24 @@ void builder(int builderIndex, int numOfSplitters, int numOfBuilders, int builde
         while (token) {
             // Process each word
             printf("Builder %d processes word '%s'\n", builderIndex, token);
-            
+
             // insert to hash table
             insert_hash_table(table, token);
 
             token = strtok(NULL, delim);
         }
     }
-
+    int writeFd = builderToRootPipes[builderIndex][1]; // write
     send_hash_table_to_root(table, writeFd);
+
+    close(writeFd); // Close the write end after sending data
+    destroy_hash_table(table);
+
     // send hash table to root
     // free hash table
-    print_hash_table(table);
+    // printf("Builder: %d\n", builderIndex);
+
+    // print_hash_table(table);
     // Free allocated memory
     free(buffer);
 }

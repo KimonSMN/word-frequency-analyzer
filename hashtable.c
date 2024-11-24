@@ -4,7 +4,7 @@
 #include <unistd.h>
 
 #include "hashtable.h"
-
+#include "helper.h"
 // Hash function
 unsigned long hash(unsigned char *str, int capacity)
 {
@@ -93,20 +93,32 @@ void send_hash_table_to_root(struct hash_table *table, int writeFd){
     for (int i = 0; i < table->capacity; i++){
         struct hash_node *node = table->array[i];
         while(node != NULL){
-            // write length of word
-            // write word 
-            // write frequency
-            // node->word[strlen(node->word) - 1] = '\0'; unessecary words already good
+            printf("Builder is sending word: %s, frequency: %d\n", node->word, node->count);
 
             int n = strlen(node->word) + 1;
-            write(writeFd ,&n, sizeof(int));
+            if(write(writeFd ,&n, sizeof(int)) != sizeof(int)){
+                perror("Error writing word length");
+                exit(EXIT_FAILURE);
+            }
 
-            write(writeFd, node->word, sizeof(char) * n);
-
-            write(writeFd, &node->count, sizeof(int));
+            if(write(writeFd, node->word, sizeof(char) * n) != n){
+                perror("Error writing word");
+                exit(EXIT_FAILURE);
+            }
+            
+            if(write(writeFd, &node->count, sizeof(int)) != sizeof(int)){
+                perror("Error writing frequency");
+                exit(EXIT_FAILURE);
+            }
 
             node = node->next;
         }
     }
+    int end_marker = 0;
+    if (write(writeFd, &end_marker, sizeof(int)) != sizeof(int)) {
+        perror("Error writing end marker");
+        exit(1);
+    }
+    
 }
 
