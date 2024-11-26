@@ -114,7 +114,7 @@ void send_hash_table_to_root(struct hash_table *table, int writeFd){
     for (int i = 0; i < table->capacity; i++){
         struct hash_node *node = table->array[i];
         while(node != NULL){
-            printf("Builder is sending word: %s, frequency: %d\n", node->word, node->count);
+            // printf("Builder is sending word: %s, frequency: %d\n", node->word, node->count);
 
             int n = strlen(node->word) + 1;
             if(write(writeFd ,&n, sizeof(int)) != sizeof(int)){

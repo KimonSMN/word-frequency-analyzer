@@ -9,7 +9,7 @@
 #include <stdbool.h>
 
 #include "hashtable.h"
-
+#include "helper.h"
 void trim_newline(char *str) {
     size_t len = strlen(str);
     if (len > 0 && (str[len - 1] == '\n' || str[len - 1] == '\r')) {
@@ -39,30 +39,42 @@ bool isExcluded(char *word, char *exclusionList[], int exclusionListSize){
     return false;
 }
 
-
-
 void splitter(int splitterIndex, int numOfSplitters, int numOfBuilders, char *inputFile, int inputFileLines, int builderPipes[numOfBuilders][2], int exclusionListSize ,char *exclusionList[]){
 
-
-    // Initialize buffers for each builder
-    char **builderBuffers = malloc(numOfBuilders * sizeof(char *));
-    size_t *builderBufferSizes = malloc(numOfBuilders * sizeof(size_t));
-
-    for (int b = 0; b < numOfBuilders; b++) {
-        builderBuffers[b] = NULL;
-        builderBufferSizes[b] = 0;
+    // Initialize buffers.
+    // We use calloc to avoid manually setting the values to NULL & 0.
+    char **builderBuffers = calloc(numOfBuilders, sizeof(char*));
+    if (builderBuffers == NULL){    // Error handling
+        perror("Memory allocation failed for builderBuffers");
+        exit(1);
     }
 
-
-    FILE *file = fopen(inputFile, "r");
-
-    int sectionFrom = splitterIndex * (inputFileLines / numOfSplitters); // splitter_2 * (1000 lines / 4) => 2 * 250 => 500 
-    int sectionTo = sectionFrom + (inputFileLines / numOfSplitters);     // 500 + (1000/4) => 750
-    if (splitterIndex == numOfSplitters - 1) {
-        sectionTo = inputFileLines; // Ensure the last splitter gets all remaining lines
+    size_t *builderBufferSizes = calloc(numOfBuilders, sizeof(size_t));
+    if (builderBufferSizes == NULL){    // Error handling
+        perror("Memory allocation failed for builderBufferSizes");
+        exit(1);
     }
 
-    // Skip lines until sectionFrom
+    FILE *file = fopen(inputFile, "r"); // open inputFile
+    if (file == NULL) {
+        perror("Error opening input file");
+        exit(1);
+    }
+    int sectionSize = (inputFileLines + numOfSplitters - 1) / numOfSplitters; // Ceil division
+    int sectionFrom = splitterIndex * (inputFileLines / numOfSplitters); // Starting section (Splitter starts reading from here).
+    int sectionTo = sectionFrom + (inputFileLines / numOfSplitters);     // Ending section  (Splitter ends the reading here).
+    if (sectionTo > inputFileLines) {
+        sectionTo = inputFileLines; // Ensure the last splitter processes up to the last line
+    }
+    printf("Splitter %d processes lines [%d, %d)\n", splitterIndex, sectionFrom, sectionTo);
+
+    // If splitterIndex is the last splitter,
+    // it gets all the remaining file lines.
+    if (splitterIndex == numOfSplitters - 1) {  
+        sectionTo = inputFileLines;
+    }
+
+    // Skip lines until sectionFrom.
     size_t len = 0;
     char *line = NULL;
     for (int currentLine = 0; currentLine < sectionFrom; currentLine++) {
@@ -86,6 +98,7 @@ void splitter(int splitterIndex, int numOfSplitters, int numOfBuilders, char *in
 
         clean_text(line);
         trim_newline(line);
+        
         token = strtok(line, delim);
 
         while (token) {
@@ -112,8 +125,10 @@ void splitter(int splitterIndex, int numOfSplitters, int numOfBuilders, char *in
             }
 
             char *temp = realloc(builderBuffers[builderIndex], newSize);
-            if (temp == NULL) {
-                perror("Realloc failed");
+            if (temp == NULL) { // In case were realloc failed 
+                perror("Realloc failed");   // print error
+                free(line); // free 
+                fclose(file);
                 exit(1);
             }
             builderBuffers[builderIndex] = temp;
@@ -130,9 +145,10 @@ void splitter(int splitterIndex, int numOfSplitters, int numOfBuilders, char *in
                 builderBufferSizes[builderIndex] = oldSize + 1 + tokenLen;
             }
 
-            printf("Splitter %d queues '%s' for Builder %d\n", splitterIndex, token, builderIndex);
+            // printf("Splitter %d queues '%s' for Builder %d\n", splitterIndex, token, builderIndex);
 
             token = strtok(NULL, delim);
+
         }
     }
 
@@ -150,7 +166,7 @@ void splitter(int splitterIndex, int numOfSplitters, int numOfBuilders, char *in
                 perror("Error writing buffer to pipe");
             }
 
-            printf("Splitter %d sends merged words to Builder %d\n", splitterIndex, b);
+            // printf("Splitter %d sends merged words to Builder %d\n", splitterIndex, b);
         }
     }
 
@@ -160,7 +176,6 @@ void splitter(int splitterIndex, int numOfSplitters, int numOfBuilders, char *in
     }
     free(builderBuffers);
     free(builderBufferSizes);
-
     free(line);
     fclose(file);
 }

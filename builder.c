@@ -14,7 +14,7 @@
 void builder(int builderIndex, int numOfBuilders, int builderPipes[numOfBuilders][2], int builderToRootPipes[numOfBuilders][2]) {
 
     // Create hash table
-    struct hash_table *table = create_hash_table(3079); // maybe pass the lines of the file and split by the builders and get the size as  the capacity
+    struct hash_table *table = create_hash_table(10000); // maybe pass the lines of the file and split by the builders and get the size as  the capacity
     
     // Initialize variables
     char *buffer = NULL;
@@ -25,7 +25,7 @@ void builder(int builderIndex, int numOfBuilders, int builderPipes[numOfBuilders
         ssize_t nbytes = read(builderPipes[builderIndex][0], &n, sizeof(int));
 
         if (nbytes == 0) {
-            // EOF detected, no more data
+            // EOF
             break;
         } else if (nbytes < 0) {
             perror("Error reading size from pipe");
@@ -34,6 +34,9 @@ void builder(int builderIndex, int numOfBuilders, int builderPipes[numOfBuilders
             fprintf(stderr, "Partial read of size\n");
             exit(1);
         }
+
+        if (n == 0) break; // End marker detected
+
 
         // Allocate buffer to receive the data
         buffer = realloc(buffer, n); 
@@ -46,6 +49,8 @@ void builder(int builderIndex, int numOfBuilders, int builderPipes[numOfBuilders
         nbytes = read(builderPipes[builderIndex][0], buffer, n);
         if (nbytes != n) {
             perror("Error reading buffer from pipe");
+            free(buffer);
+
             exit(1);
         }
 
@@ -55,10 +60,6 @@ void builder(int builderIndex, int numOfBuilders, int builderPipes[numOfBuilders
         token = strtok(buffer, delim);
 
         while (token) {
-            // Process each word
-            printf("Builder %d processes word '%s'\n", builderIndex, token);
-
-            // insert to hash table
             insert_hash_table(table, token);
 
             token = strtok(NULL, delim);
@@ -68,15 +69,11 @@ void builder(int builderIndex, int numOfBuilders, int builderPipes[numOfBuilders
     send_hash_table_to_root(table, writeFd);
 
     close(writeFd); // Close the write end after sending data
-    destroy_hash_table(table);
 
-    // send hash table to root
-    // free hash table
-    // printf("Builder: %d\n", builderIndex);
+    // Cleanup
+    destroy_hash_table(table); 
 
-    // print_hash_table(table);
-    // Free allocated memory
-    free(buffer);
+    free(buffer);   
 }
 
 

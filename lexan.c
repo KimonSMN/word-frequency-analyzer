@@ -52,7 +52,7 @@ int main(int argc, char *argv[]) {
     int numOfBuilders = 0;
     int topK = 0;
     char *exclusionFileName = NULL;
-    char *outputFile = NULL;
+    char *outputFileName = NULL;
 
     // Parse the arguments
     for (int i = 1; i < argc; i++) {
@@ -67,7 +67,7 @@ int main(int argc, char *argv[]) {
         } else if (strcmp(argv[i], "-e") == 0) {
             exclusionFileName = argv[++i];
         } else if (strcmp(argv[i], "-o") == 0) {
-            outputFile = argv[++i];
+            outputFileName = argv[++i];
         } else {
             printf("Unknown argument: %s\n", argv[i]);
             return 1;
@@ -75,58 +75,83 @@ int main(int argc, char *argv[]) {
     }
 
     //////// READ FILE LINES ////////
-    FILE *inputFile = fopen(inputFileName, "r");
+    FILE *inputFile = fopen(inputFileName, "r");    // Open the inputFile
     if (inputFile == NULL) {
         perror("Error opening input file");
         exit(1);
     }
 
-    int current_line = 1;
-    int ch;  // Use int to accommodate EOF value
-    while ((ch = fgetc(inputFile)) != EOF) {
-        if (ch == '\n') {
-            current_line++;
+  int inputFileLines = 0; // Initialize to 0
+    char *linee = NULL;
+    size_t len = 0;
+
+    while (getline(&linee, &len, inputFile) != -1) {
+        // Trim the line to remove leading and trailing whitespace
+        trimwhitespace(linee);
+
+        // Count the line only if it's not empty
+        if (linee[0] != '\0') {
+            inputFileLines++;
         }
     }
+    printf("Input File has: %d lines\n", inputFileLines);
+    fclose(inputFile);  // Close the inputFile 
 
-    // fseek(inputFile, 0, SEEK_END);
-    // if (ftell(inputFile) > 0) {
-    //     fseek(inputFile, -1, SEEK_END);
-    //     if (fgetc(inputFile) != '\n') {
-    //         current_line++;
-    //     }
-    // }
-    printf("FILE HAS %d LINES\n", current_line);
-    fclose(inputFile);
-
-    //////// READ SIZE OF EXCLUSION FILE ////////
+    //// READ SIZE OF EXCLUSION FILE ////
     FILE *exclusionFile = fopen(exclusionFileName, "r");
 
     int exclusionFileLines = 0;
-    // Reset ch for reuse
+    int lastChar = 0;
+    int ch;
+    // Count lines
     while ((ch = fgetc(exclusionFile)) != EOF) {
         if (ch == '\n') {
             exclusionFileLines++;
         }
+        lastChar = ch;
+    }
+
+    // If the last character is not a newline, count the final line
+    if (lastChar != '\n') {
+        exclusionFileLines++;
     }
 
     printf("EXCLUSION HAS %d LINES\n", exclusionFileLines);
 
     // Allocate memory for the exclusion list
-    char line[128];
-    char **exclusionList = malloc(exclusionFileLines * sizeof(char *));
+    char line[64];
+    char **exclusionList = NULL;
+    if (exclusionFileLines > 0) {
+        exclusionList = calloc(exclusionFileLines, sizeof(char *));
+        if (exclusionList == NULL) {
+            perror("Memory allocation failed for exclusionList");
+            exit(1);
+        }
+    }
+
     int i = 0;
-
     rewind(exclusionFile);
-
-    while (fgets(line, sizeof(line), exclusionFile)) {
-        line[strcspn(line, "\r\n")] = '\0';
+    while (i < exclusionFileLines && fgets(line, sizeof(line), exclusionFile)) {
+        line[strcspn(line, "\r\n")] = '\0'; // Remove newline
         trimwhitespace(line);
+
+        if (line[0] == '\0') { // Skip empty lines
+            exclusionFileLines--; // Adjust expected count for skipped lines
+            continue;
+        }
+
         exclusionList[i] = strdup(line);
+        if (exclusionList[i] == NULL) {
+            perror("Memory allocation failed for exclusion list item");
+            exit(1);
+        }
         i++;
     }
-    fclose(exclusionFile);
 
+    if (i != exclusionFileLines) {
+        printf("Warning: Expected %d exclusion lines, but only processed %d.\n", exclusionFileLines, i);
+    }
+    fclose(exclusionFile);
     //////// CREATE PIPES ////////
  
     // Pipes for Splitters & Builders
@@ -167,7 +192,7 @@ int main(int argc, char *argv[]) {
 
             // ADD LOGIC HERE
 
-            splitter(s, numOfSplitters, numOfBuilders, inputFileName, current_line, builderPipes, exclusionFileLines, exclusionList);
+            splitter(s, numOfSplitters, numOfBuilders, inputFileName, inputFileLines, builderPipes, exclusionFileLines, exclusionList);
 
             // Close write ends before exiting
             for (int b = 0; b < numOfBuilders; b++) {
@@ -237,14 +262,13 @@ int main(int argc, char *argv[]) {
 
     // CREATING THE MAIN HASHTABLE
 
-    struct hash_table *mainTable = create_hash_table(current_line); // make it appropriate (prime num)
+    struct hash_table *mainTable = create_hash_table(inputFileLines); // make it appropriate (prime num)
 
     for (int b = 0; b < numOfBuilders; b++) {
         close(builderToRootPipes[b][1]); // Close write ends in root
 
         while(1){
             int n;
-            char *buffer = malloc(n);
             int freq;
 
             ssize_t nbytes = read_nbytes(builderToRootPipes[b][0], &n, sizeof(int));
@@ -256,9 +280,11 @@ int main(int argc, char *argv[]) {
             }
             if (n == 0) {
                 // End marker received
-                printf("Root: Received end marker from Builder %d\n", b);
+                // printf("Root: Received end marker from Builder %d\n", b);
                 break;
             }
+            char *buffer = malloc(n);
+
             nbytes = read_nbytes(builderToRootPipes[b][0], buffer, sizeof(char) * n);
             if(nbytes < 0){
                 return 1;
@@ -267,7 +293,7 @@ int main(int argc, char *argv[]) {
             if(nbytes < 0){
                 return 1;
             } 
-            printf("Received from Builder %d: %s, %d\n", b, buffer, freq);
+            // printf("Received from Builder %d: %s, %d\n", b, buffer, freq);
 
             struct hash_node *node = search_hash_table(mainTable, buffer);
             if(node != NULL){
@@ -275,12 +301,11 @@ int main(int argc, char *argv[]) {
             } else{
                 insert_hash_table_freq(mainTable, buffer, freq);
             }
-
+            free(buffer);
         }
 
         close(builderToRootPipes[b][0]);
     }
-
 
     // Find top-k
 
@@ -309,13 +334,17 @@ int main(int argc, char *argv[]) {
             node = node->next;
         }
     }
+
     qsort(word_array, totalWords, sizeof(struct hash_node *), compare_frequency);
 
-    print_hash_table(mainTable);
+    // print_hash_table(mainTable);
 
     printf("Top %d words:\n", topK);
     for (int i = 0; i < topK && i < totalWords; i++) {
         printf("%s: %d\n", word_array[i]->word, word_array[i]->count);
     }
+    free(word_array);
+    destroy_hash_table(mainTable);
+    free(exclusionList);
     return 0;
 }
