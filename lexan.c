@@ -37,7 +37,12 @@ char *trimwhitespace(char *str)
 
     return str;
 }
-
+int compare_frequency(const void *a, const void *b) {
+    struct hash_node *nodeA = *(struct hash_node **)a;
+    struct hash_node *nodeB = *(struct hash_node **)b;
+    // For descending order
+    return nodeB->count - nodeA->count;
+}
 int main(int argc, char *argv[]) {
 
     //////// HANDLE COMMAND LINE ARGUMENTS ////////
@@ -229,6 +234,11 @@ int main(int argc, char *argv[]) {
 
     // PARENT PROCESS
 
+
+    // CREATING THE MAIN HASHTABLE
+
+    struct hash_table *mainTable = create_hash_table(current_line); // make it appropriate (prime num)
+
     for (int b = 0; b < numOfBuilders; b++) {
         close(builderToRootPipes[b][1]); // Close write ends in root
 
@@ -258,11 +268,54 @@ int main(int argc, char *argv[]) {
                 return 1;
             } 
             printf("Received from Builder %d: %s, %d\n", b, buffer, freq);
-        }
 
+            struct hash_node *node = search_hash_table(mainTable, buffer);
+            if(node != NULL){
+                node->count += freq;
+            } else{
+                insert_hash_table_freq(mainTable, buffer, freq);
+            }
+
+        }
 
         close(builderToRootPipes[b][0]);
     }
 
+
+    // Find top-k
+
+    int totalWords = 0;
+
+    for(int i =0; i < mainTable->capacity; i++){
+        struct hash_node *current_node = mainTable->array[i];
+        while (current_node != NULL){
+            totalWords++;
+            current_node = current_node->next; 
+        }
+    }
+
+    struct hash_node **word_array = malloc(totalWords * sizeof(struct hash_node*));
+    if (word_array == NULL) {
+        perror("Malloc failed");
+        exit(EXIT_FAILURE);
+    }
+
+    // Populate the array
+    int idx = 0;
+    for (int i = 0; i < mainTable->capacity; i++) {
+        struct hash_node *node = mainTable->array[i];
+        while (node != NULL) {
+            word_array[idx++] = node;
+            node = node->next;
+        }
+    }
+    qsort(word_array, totalWords, sizeof(struct hash_node *), compare_frequency);
+
+    print_hash_table(mainTable);
+
+    printf("Top %d words:\n", topK);
+    for (int i = 0; i < topK && i < totalWords; i++) {
+        printf("%s: %d\n", word_array[i]->word, word_array[i]->count);
+    }
     return 0;
 }

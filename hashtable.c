@@ -42,6 +42,27 @@ void insert_hash_table(struct hash_table *table, char *word) {
     table->array[index] = new_node;
 }
 
+void insert_hash_table_freq(struct hash_table *table, char *word, int freq) {
+
+    unsigned long index = hash(word, table->capacity);
+
+    struct hash_node *node = table->array[index];
+    while (node != NULL) {
+        if (strcmp(node->word, word) == 0) {
+            node->count++;
+            return;
+        }
+        node = node->next;
+    }
+
+    struct hash_node *new_node = malloc(sizeof(struct hash_node));
+    new_node->word = strdup(word);
+    new_node->count = freq;
+    new_node->next = table->array[index];
+    table->array[index] = new_node;
+}
+
+
 struct hash_node *search_hash_table(struct hash_table *table, char *word){
     unsigned long index = hash(word, table->capacity);
 

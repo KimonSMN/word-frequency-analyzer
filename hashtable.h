@@ -18,6 +18,8 @@ struct hash_table *create_hash_table(int capacity);
 
 void insert_hash_table(struct hash_table *table, char *word);
 
+void insert_hash_table_freq(struct hash_table *table, char *word, int freq);
+
 struct hash_node *search_hash_table(struct hash_table *table, char *word);
 
 void destroy_hash_table(struct hash_table *table);
