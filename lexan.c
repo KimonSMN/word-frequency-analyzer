@@ -15,23 +15,22 @@
 #include "builder.h"
 #include "helper.h"
 
-// global
-int completed_splitters = 0;
-int completed_builders = 0;
+// Global variables for signal handling.
+int completedSplitters = 0;
+int completedBuilders = 0;
 
 // // Signal Handlers
-void handle_sigusr1(){
-    completed_splitters++;
+void handle_sigusr(int signal){
+    if (signal == SIGUSR1) {
+        completedSplitters++;
+    } else if (signal == SIGUSR2) {
+        completedBuilders++;
+    }
 
 }
-void handle_sigusr2(){
-    completed_builders++;
-}
-// Note: This function returns a pointer to a substring of the original string.
-// If the given string was allocated dynamically, the caller must not overwrite
-// that pointer with the returned value, since the original pointer must be
-// deallocated using the same allocator with which it was allocated.  The return
-// value must NOT be deallocated using free() etc.
+
+
+// https://stackoverflow.com/questions/122616/how-do-i-trim-leading-trailing-whitespace-in-a-standard-way?page=1&tab=scoredesc#tab-top
 char *trimwhitespace(char *str)
 {
     char *end;
@@ -51,16 +50,18 @@ char *trimwhitespace(char *str)
 
     return str;
 }
+
+// Compare Function for qsort()
 int compare_frequency(const void *a, const void *b) {
     struct hash_node *nodeA = *(struct hash_node **)a;
     struct hash_node *nodeB = *(struct hash_node **)b;
-    // For descending order
-    return nodeB->count - nodeA->count;
+    return nodeB->count - nodeA->count; // Decending order.
 }
+
 int main(int argc, char *argv[]) {
 
     //////// HANDLE COMMAND LINE ARGUMENTS ////////
-
+    
     char *inputFileName = NULL;
     int numOfSplitters = 0;
     int numOfBuilders = 0;
@@ -89,130 +90,102 @@ int main(int argc, char *argv[]) {
     }
 
 
-    struct sigaction sa1;
-    sa1.sa_handler = &handle_sigusr1;
-    // sigemptyset(&sa1.sa_mask);
-    sa1.sa_flags = 0;
-
-    sigaction(SIGUSR1, &sa1, NULL);
-
-    struct sigaction sa2;
-    sa2.sa_handler = &handle_sigusr2;
-    // sigemptyset(&sa2.sa_mask);
-    sa2.sa_flags = 0;
-
-    sigaction(SIGUSR2, &sa2, NULL);
+    //////// HANDLE SIGNALS ////////
+    struct sigaction sa;
+    sa.sa_handler = &handle_sigusr;
+    sa.sa_flags = 0;
+    sigaction(SIGUSR1, &sa, NULL);
+    sigaction(SIGUSR2, &sa, NULL);
 
 
-    //////// READ FILE LINES ////////
-    FILE *inputFile = fopen(inputFileName, "r");    // Open the inputFile
-    if (inputFile == NULL) {
-        perror("Error opening input file");
+
+    //////// READ INPUT FILE LINES ////////
+    FILE *inputFile = fopen(inputFileName, "r");    // Open inputFile for reading.
+    if (inputFile == NULL) {                        // Error checking.
+        perror("Error: Opening input file failed.");
         exit(1);
     }
 
-  int inputFileLines = 0; // Initialize to 0
-    char *linee = NULL;
-    size_t len = 0;
+    int inputFileLines = 0; // Counter for the number of lines in the file.
+    char *inputLine = NULL; // Pointer to hold current line read. 
+    size_t len = 0;         // Size of the inputLine, used in getline().
 
-    while (getline(&linee, &len, inputFile) != -1) {
-        // Trim the line to remove leading and trailing whitespace
-        trimwhitespace(linee);
+    while (getline(&inputLine, &len, inputFile) != -1) {
 
-        // Count the line only if it's not empty
-        if (linee[0] != '\0') {
-            inputFileLines++;
+        trimwhitespace(inputLine);  // Trims the white-space of the inputFile.
+
+        if (inputLine[0] != '\0') { // If the line isn't empty, then
+            inputFileLines++;       // increment inputFileLine.
         }
     }
-    printf("Input File has: %d lines\n", inputFileLines);
-    fclose(inputFile);  // Close the inputFile 
+    fclose(inputFile);  // Close the inputFile after use. 
+    // printf("Input File has: %d lines\n", inputFileLines); // Debuging
 
-    //// READ SIZE OF EXCLUSION FILE ////
-    FILE *exclusionFile = fopen(exclusionFileName, "r");
-
-    int exclusionFileLines = 0;
-    int lastChar = 0;
-    int ch;
-    // Count lines
-    while ((ch = fgetc(exclusionFile)) != EOF) {
-        if (ch == '\n') {
-            exclusionFileLines++;
+    //// READ EXCLUSION FILE LINES ////
+    FILE *exclusionFile = fopen(exclusionFileName, "r"); // Open exclusionFile for reading.
+ 
+    int exclusionFileLines = 0; // Counter for the number of lines in the file.
+    int lastChar = 0;           // Counter to track If the last line is empty or not.
+    int ch;                     // Counter to track each character.
+    while ((ch = fgetc(exclusionFile)) != EOF) {    // Loop until EOF
+        if (ch == '\n') {   // Exclusion files don't have empty lines, so we can check for new-line character.
+            exclusionFileLines++;   // increment exclusionFileLines
         }
         lastChar = ch;
     }
 
-    // If the last character is not a newline, count the final line
+    // If last character is not an empty line, increment exclusionFileLines.
     if (lastChar != '\n') {
         exclusionFileLines++;
     }
 
-    // printf("Exclusion has %d lines\n", exclusionFileLines);
 
     // Allocate memory for the exclusion list
-    char line[64];
+    char line[64]; // The longest word in most standard English dictionaries has 45 letters.
     char **exclusionList = NULL;
-    if (exclusionFileLines > 0) {
-        exclusionList = calloc(exclusionFileLines, sizeof(char *));
-        if (exclusionList == NULL) {
-            perror("Memory allocation failed for exclusionList");
+    if (exclusionFileLines > 0) {   // Check If there is at least 1 excluded word.
+        exclusionList = calloc(exclusionFileLines, sizeof(char*)); // Calloc over malloc, to avoid one extra loop to initialize elements to NULL.
+        if (exclusionList == NULL) {    // Error checking.
+            perror("Memory allocation failed for exclusionList.");
             exit(1);
         }
     }
 
     int i = 0;
-    rewind(exclusionFile);
+    rewind(exclusionFile);  // Rewind the file.
     while (i < exclusionFileLines && fgets(line, sizeof(line), exclusionFile)) {
-        line[strcspn(line, "\r\n")] = '\0'; // Remove newline
+        line[strcspn(line, "\r\n")] = '\0'; // Remove newline character
         trimwhitespace(line);
 
-        if (line[0] == '\0') { // Skip empty lines
-            exclusionFileLines--; // Adjust expected count for skipped lines
-            continue;
-        }
-
-        exclusionList[i] = strdup(line);
-        if (exclusionList[i] == NULL) {
-            perror("Memory allocation failed for exclusion list item");
+        exclusionList[i] = strdup(line);    // Create a copy of line, and set it as element 'i'.
+        if (exclusionList[i] == NULL) {     // Error checking.
+            perror("Memory allocation failed for exclusionList element.");
             exit(1);
         }
         i++;
     }
 
-    if (i != exclusionFileLines) {
-        printf("Warning: Expected %d exclusion lines, but only processed %d.\n", exclusionFileLines, i);
+    if (i != exclusionFileLines) {  // Error checking.
+        printf("Expected %d exclusion lines, but processed %d.\n", exclusionFileLines, i);
     }
+
     fclose(exclusionFile);
+
+    // printf("Exclusion file has %d lines\n", exclusionFileLines); // Debugging
+
     //////// CREATE PIPES ////////
- 
-    // Pipes for Splitters & Builders
-    int builderPipes[numOfBuilders][2]; // [][0] for reading by builders, [][1] for writing by splitters
+   
 
-    for (int b = 0; b < numOfBuilders; b++) {
-        if (pipe(builderPipes[b]) == -1) {
-            perror("Pipe creation failed");
-            exit(1);
-        }
-    }
+    int builderPipes[numOfBuilders][2];         // Pipes for Splitters & Builders, [][0] for reading by builders, [][1] for writing by splitters
+    int builderToRootPipes[numOfBuilders][2];   // Pipes for Builders & Root,      [][0] for reading by root, [][1] for writing by builders
+    int builderTimingPipes[numOfBuilders][2];   // Pipes for Builder's time,       [][0] for reading by root, [][1] for writing by builders
 
-    // Pipes for Builders & Root
+    for (int b = 0; b< numOfBuilders; b++) {
+        if (pipe(builderPipes[b]) == -1
+            || pipe(builderToRootPipes[b]) == -1
+            || pipe(builderTimingPipes[b]) == -1) { 
 
-    int builderToRootPipes[numOfBuilders][2]; // [][0] for reading by root, [][1] for writing by builders
-
-    for (int b = 0; b < numOfBuilders; b++) {
-        if (pipe(builderToRootPipes[b]) == -1) {
-            perror("Pipe creation failed");
-            exit(1);
-        }
-    }
-
-    // pipes for builder's time 
-
-    int builderTimingPipes[numOfBuilders][2]; // [][0] for reading by root, [][1] for writing by builders
-
-    // Create pipes for timing information
-    for (int b = 0; b < numOfBuilders; b++) {
-        if (pipe(builderTimingPipes[b]) == -1) {
-            perror("Pipe creation failed for timing");
+            perror("Error: Pipe creation failed");
             exit(1);
         }
     }
@@ -221,37 +194,32 @@ int main(int argc, char *argv[]) {
 
     for (int s = 0; s < numOfSplitters; s++) {
         int pid = fork();
-        if (pid == -1) {
-            perror("Error creating splitter process");
-            return 2;
+        if (pid == -1) { // Error checking.
+            perror("Error: Splitter creation failed.");
+            exit(1);
         }
-
-        if (pid == 0) { // Child process (splitter)
-            for(int b = 0;b < numOfBuilders; b++){
-                close(builderPipes[b][0]);  // Close read ends of each builder pipe
+        if (pid == 0) { // Child process (splitter).
+        
+            for (int b = 0; b < numOfBuilders;b++){ 
+                close(builderPipes[b][0]); // Close read ends.
             }
-
-            // ADD LOGIC HERE
 
             splitter(s, numOfSplitters, numOfBuilders, inputFileName, inputFileLines, builderPipes, exclusionFileLines, exclusionList);
 
-            // Close write ends
             for (int b = 0; b < numOfBuilders; b++) {
-                close(builderPipes[b][1]);
+                close(builderPipes[b][1]); // Close write ends.
             }
 
-            // Exit after processing
-            return 1;
+            return 1;   // Exit after processing.
         }
     }
-
 
     //////// FORK BUILDERS ////////
     for (int b = 0; b < numOfBuilders; b++) {
         int pid = fork();
         if (pid == -1) {
-            perror("Error creating builder process");
-            return 2;
+            perror("Error: Builder creation failed.");
+            exit(1);
         }
 
         if (pid == 0) { // Child process
@@ -351,14 +319,14 @@ int main(int argc, char *argv[]) {
 
         ssize_t nbytes = read(builderTimingPipes[b][0], &elapsed_time, sizeof(double));
         if (nbytes < 0) {
-            perror("Error reading timing information");
+            perror("Error: Reading time information failed.");
             exit(1);
         } else if (nbytes == 0) {
-            printf("No timing information received from Builder %d\n", b);
+            printf("No time information received from Builder: %d\n", b);
             continue;
         }
 
-        printf("Builder %d took %f seconds to finish.\n", b, elapsed_time);
+        printf("Builder: %d took: %f seconds to finish.\n", b, elapsed_time);
 
         close(builderTimingPipes[b][0]); // Close the read end of the timing pipe
     }
@@ -399,8 +367,8 @@ int main(int argc, char *argv[]) {
         fprintf(filePtr,"%s: %d\n", word_array[i]->word, word_array[i]->count);
     }
 
-    printf("Splitter signals: %d\n", completed_splitters);
-    printf("Builder signals: %d\n", completed_builders);
+    printf("Splitter signals: %d\n", completedSplitters);
+    printf("Builder signals: %d\n", completedBuilders);
 
     fclose(filePtr);
     free(word_array);

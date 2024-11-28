@@ -23,3 +23,4 @@ ssize_t safe_read(int fd, char *buffer, size_t n) {
     }
     return total_read;
 }
+
