@@ -5,6 +5,12 @@
 
 #include "hashtable.h"
 #include "helper.h"
+
+
+int prime_sizes[] = {53, 97, 193, 389, 769, 1543, 3079, 6151, 12289, 24593, 49157, 98317, 196613, 393241,
+	786433, 1572869, 3145739, 6291469, 12582917, 25165843, 50331653, 100663319, 201326611, 402653189, 805306457, 1610612741};
+
+
 // Hash function
 unsigned long hash(unsigned char *str, int capacity)
 {
@@ -143,3 +149,11 @@ void send_hash_table_to_root(struct hash_table *table, int writeFd){
     
 }
 
+int get_hash_table_capacity(int wordsPerBuilder){
+    int len = sizeof(prime_sizes) / sizeof(int);
+    for (int i = 0; i < len; i++){
+        if(prime_sizes[i] > wordsPerBuilder){
+            return prime_sizes[i];
+        }
+    }
+}

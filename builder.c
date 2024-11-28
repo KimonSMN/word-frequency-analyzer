@@ -11,21 +11,22 @@
 #include "hashtable.h"
 #include "helper.h"
 
-void builder(int builderIndex, int numOfBuilders, int builderPipes[numOfBuilders][2], int builderToRootPipes[numOfBuilders][2]) {
+void builder(int builderIndex, int numOfBuilders, int builderPipes[numOfBuilders][2], int builderToRootPipes[numOfBuilders][2], int inputFileLines, pid_t root_pid) {
 
-    // Create hash table
-    struct hash_table *table = create_hash_table(10000); // maybe pass the lines of the file and split by the builders and get the size as  the capacity
-    
-    // Initialize variables
+    // Initialize Hash Table. 
+    int wordsPerBuilder = (inputFileLines * 10) / numOfBuilders;    // Approximately 10 words per line.
+    int uniqueWords = wordsPerBuilder * 0.5;                        // 50% of the words are unique.
+    int hashTableCapacity = get_hash_table_capacity(uniqueWords);   // Find a "good" size for the hash table based on the uniqueWords.
+    struct hash_table *table = create_hash_table(hashTableCapacity);// Create the hash table.
+
+    // Initialize variables.
     char *buffer = NULL;
 
-    while (1) {
-        // Read the size of the incoming data
+    
+    while (1) { // It loops until EOF, or until something goes wrong.
         int n;
-        ssize_t nbytes = read(builderPipes[builderIndex][0], &n, sizeof(int));
-
+        ssize_t nbytes = read(builderPipes[builderIndex][0], &n, sizeof(int));  // Read the size n of the incoming data
         if (nbytes == 0) {
-            // EOF
             break;
         } else if (nbytes < 0) {
             perror("Error reading size from pipe");
@@ -74,6 +75,9 @@ void builder(int builderIndex, int numOfBuilders, int builderPipes[numOfBuilders
     destroy_hash_table(table); 
 
     free(buffer);   
+
+    kill(getppid(), SIGUSR2);
+
 }
 
 

@@ -29,7 +29,6 @@ void clean_text(char *str) {
     }
     str[j] = '\0';
 }
-
 bool isExcluded(char *word, char *exclusionList[], int exclusionListSize){
     for (int i = 0; i < exclusionListSize; i++) {
         if (strcmp(word, exclusionList[i]) == 0) {
@@ -168,6 +167,7 @@ void splitter(int splitterIndex, int numOfSplitters, int numOfBuilders, char *in
 
             // printf("Splitter %d sends merged words to Builder %d\n", splitterIndex, b);
         }
+        
     }
 
     // Free allocated memory
@@ -178,4 +178,7 @@ void splitter(int splitterIndex, int numOfSplitters, int numOfBuilders, char *in
     free(builderBufferSizes);
     free(line);
     fclose(file);
+
+    kill(getppid(), SIGUSR1);
+
 }

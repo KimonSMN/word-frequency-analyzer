@@ -22,6 +22,9 @@
     "functional": "c",
     "tuple": "c",
     "utility": "c",
-    "helper.h": "c"
+    "helper.h": "c",
+    "stdbool.h": "c",
+    "splitter.h": "c",
+    "sigaction.h": "c"
   }
 }

@@ -5,14 +5,28 @@
 #include <time.h>
 #include <sys/wait.h>
 #include <fcntl.h>
-#include <signal.h>
 #include <ctype.h>
+#include <stdbool.h>
+#include <signal.h>
+#include <bits/sigaction.h>
 
-#include <arpa/inet.h> // For htonl and ntohl
 
 #include "splitter.h"
 #include "builder.h"
 #include "helper.h"
+
+// global
+int completed_splitters = 0;
+int completed_builders = 0;
+
+// // Signal Handlers
+void handle_sigusr1(){
+    completed_splitters++;
+
+}
+void handle_sigusr2(){
+    completed_builders++;
+}
 // Note: This function returns a pointer to a substring of the original string.
 // If the given string was allocated dynamically, the caller must not overwrite
 // that pointer with the returned value, since the original pointer must be
@@ -74,6 +88,22 @@ int main(int argc, char *argv[]) {
         }
     }
 
+
+    struct sigaction sa1;
+    sa1.sa_handler = &handle_sigusr1;
+    sigemptyset(&sa1.sa_mask);
+    sa1.sa_flags = 0;
+
+    sigaction(SIGUSR1, &sa1, NULL);
+
+    struct sigaction sa2;
+    sa2.sa_handler = &handle_sigusr2;
+    sigemptyset(&sa2.sa_mask);
+    sa2.sa_flags = 0;
+
+    sigaction(SIGUSR2, &sa2, NULL);
+
+
     //////// READ FILE LINES ////////
     FILE *inputFile = fopen(inputFileName, "r");    // Open the inputFile
     if (inputFile == NULL) {
@@ -116,7 +146,7 @@ int main(int argc, char *argv[]) {
         exclusionFileLines++;
     }
 
-    printf("EXCLUSION HAS %d LINES\n", exclusionFileLines);
+    // printf("Exclusion has %d lines\n", exclusionFileLines);
 
     // Allocate memory for the exclusion list
     char line[64];
@@ -228,8 +258,7 @@ int main(int argc, char *argv[]) {
 
             // Now builder can use builderPipes[b][0] to read from splitters
             // And builderToRootPipes[b][1] to write to root
-            
-            builder(b, numOfBuilders, builderPipes, builderToRootPipes);
+            builder(b, numOfBuilders, builderPipes, builderToRootPipes, inputFileLines);
 
             // Close read end before exiting
             close(builderPipes[b][0]);
@@ -262,7 +291,7 @@ int main(int argc, char *argv[]) {
 
     // CREATING THE MAIN HASHTABLE
 
-    struct hash_table *mainTable = create_hash_table(inputFileLines); // make it appropriate (prime num)
+    struct hash_table *mainTable = create_hash_table(inputFileLines * 10); // make it appropriate (prime num)
 
     for (int b = 0; b < numOfBuilders; b++) {
         close(builderToRootPipes[b][1]); // Close write ends in root
@@ -306,7 +335,6 @@ int main(int argc, char *argv[]) {
 
         close(builderToRootPipes[b][0]);
     }
-
     // Find top-k
 
     int totalWords = 0;
@@ -339,10 +367,16 @@ int main(int argc, char *argv[]) {
 
     // print_hash_table(mainTable);
 
+    FILE *filePtr = fopen("output.txt", "w"); 
     printf("Top %d words:\n", topK);
     for (int i = 0; i < topK && i < totalWords; i++) {
-        printf("%s: %d\n", word_array[i]->word, word_array[i]->count);
+        fprintf(filePtr,"%s: %d\n", word_array[i]->word, word_array[i]->count);
     }
+
+    printf("Splitter signals: %d\n", completed_splitters);
+    printf("Builder signals: %d\n", completed_builders);
+
+    fclose(filePtr);
     free(word_array);
     destroy_hash_table(mainTable);
     free(exclusionList);
