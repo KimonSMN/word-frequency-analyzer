@@ -91,14 +91,14 @@ int main(int argc, char *argv[]) {
 
     struct sigaction sa1;
     sa1.sa_handler = &handle_sigusr1;
-    sigemptyset(&sa1.sa_mask);
+    // sigemptyset(&sa1.sa_mask);
     sa1.sa_flags = 0;
 
     sigaction(SIGUSR1, &sa1, NULL);
 
     struct sigaction sa2;
     sa2.sa_handler = &handle_sigusr2;
-    sigemptyset(&sa2.sa_mask);
+    // sigemptyset(&sa2.sa_mask);
     sa2.sa_flags = 0;
 
     sigaction(SIGUSR2, &sa2, NULL);
@@ -205,6 +205,17 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    // pipes for builder's time 
+
+    int builderTimingPipes[numOfBuilders][2]; // [][0] for reading by root, [][1] for writing by builders
+
+    // Create pipes for timing information
+    for (int b = 0; b < numOfBuilders; b++) {
+        if (pipe(builderTimingPipes[b]) == -1) {
+            perror("Pipe creation failed for timing");
+            exit(1);
+        }
+    }
 
     //////// FORK SPLITTERS ////////
 
@@ -224,9 +235,9 @@ int main(int argc, char *argv[]) {
 
             splitter(s, numOfSplitters, numOfBuilders, inputFileName, inputFileLines, builderPipes, exclusionFileLines, exclusionList);
 
-            // Close write ends before exiting
+            // Close write ends
             for (int b = 0; b < numOfBuilders; b++) {
-                close(builderPipes[b][1]); // Close write ends
+                close(builderPipes[b][1]);
             }
 
             // Exit after processing
@@ -258,9 +269,8 @@ int main(int argc, char *argv[]) {
 
             // Now builder can use builderPipes[b][0] to read from splitters
             // And builderToRootPipes[b][1] to write to root
-            builder(b, numOfBuilders, builderPipes, builderToRootPipes, inputFileLines);
+            builder(b, numOfBuilders, builderPipes, builderToRootPipes, inputFileLines, builderTimingPipes);
 
-            // Close read end before exiting
             close(builderPipes[b][0]);
             close(builderToRootPipes[b][1]);
 
@@ -270,29 +280,30 @@ int main(int argc, char *argv[]) {
 
     }
 
-    for (int b = 0; b < numOfBuilders; b++) {
-        close(builderToRootPipes[b][1]); // Close write ends in root
-    }   
-
     // Cloes all pipe ends
     for (int b = 0; b < numOfBuilders; b++) {
         close(builderPipes[b][0]);
         close(builderPipes[b][1]);
+        close(builderToRootPipes[b][1]); // Close write ends in root
+        close(builderTimingPipes[b][1]);
+
     }
-    
+
 
     // wait for all child processes to finish execution
     for (int i = 0; i < numOfSplitters + numOfBuilders; i++) {
         wait(NULL);
     }
 
-    // PARENT PROCESS
 
+    // PARENT PROCESS
 
     // CREATING THE MAIN HASHTABLE
 
-    struct hash_table *mainTable = create_hash_table(inputFileLines * 10); // make it appropriate (prime num)
-
+    int wordsPerBuilder = (inputFileLines * 10) / numOfBuilders; // Approximately 10 words per line
+    int mainTableCapacity = get_hash_table_capacity(wordsPerBuilder * numOfBuilders); // Scale for all builders
+    struct hash_table *mainTable = create_hash_table(mainTableCapacity);
+    
     for (int b = 0; b < numOfBuilders; b++) {
         close(builderToRootPipes[b][1]); // Close write ends in root
 
@@ -300,7 +311,7 @@ int main(int argc, char *argv[]) {
             int n;
             int freq;
 
-            ssize_t nbytes = read_nbytes(builderToRootPipes[b][0], &n, sizeof(int));
+            ssize_t nbytes = safe_read(builderToRootPipes[b][0], &n, sizeof(int));
             if(nbytes < 0){
                 return 1;
             } else if(nbytes == 0){
@@ -314,15 +325,14 @@ int main(int argc, char *argv[]) {
             }
             char *buffer = malloc(n);
 
-            nbytes = read_nbytes(builderToRootPipes[b][0], buffer, sizeof(char) * n);
+            nbytes = safe_read(builderToRootPipes[b][0], buffer, sizeof(char) * n);
             if(nbytes < 0){
                 return 1;
             } 
-            nbytes = read_nbytes(builderToRootPipes[b][0], &freq, sizeof(int));
+            nbytes = safe_read(builderToRootPipes[b][0], &freq, sizeof(int));
             if(nbytes < 0){
                 return 1;
             } 
-            // printf("Received from Builder %d: %s, %d\n", b, buffer, freq);
 
             struct hash_node *node = search_hash_table(mainTable, buffer);
             if(node != NULL){
@@ -334,6 +344,23 @@ int main(int argc, char *argv[]) {
         }
 
         close(builderToRootPipes[b][0]);
+    }
+
+    for (int b = 0; b < numOfBuilders; b++) {
+        double elapsed_time;
+
+        ssize_t nbytes = read(builderTimingPipes[b][0], &elapsed_time, sizeof(double));
+        if (nbytes < 0) {
+            perror("Error reading timing information");
+            exit(1);
+        } else if (nbytes == 0) {
+            printf("No timing information received from Builder %d\n", b);
+            continue;
+        }
+
+        printf("Builder %d took %f seconds to finish.\n", b, elapsed_time);
+
+        close(builderTimingPipes[b][0]); // Close the read end of the timing pipe
     }
     // Find top-k
 
@@ -368,7 +395,6 @@ int main(int argc, char *argv[]) {
     // print_hash_table(mainTable);
 
     FILE *filePtr = fopen("output.txt", "w"); 
-    printf("Top %d words:\n", topK);
     for (int i = 0; i < topK && i < totalWords; i++) {
         fprintf(filePtr,"%s: %d\n", word_array[i]->word, word_array[i]->count);
     }

@@ -65,7 +65,6 @@ void splitter(int splitterIndex, int numOfSplitters, int numOfBuilders, char *in
     if (sectionTo > inputFileLines) {
         sectionTo = inputFileLines; // Ensure the last splitter processes up to the last line
     }
-    printf("Splitter %d processes lines [%d, %d)\n", splitterIndex, sectionFrom, sectionTo);
 
     // If splitterIndex is the last splitter,
     // it gets all the remaining file lines.
@@ -154,8 +153,7 @@ void splitter(int splitterIndex, int numOfSplitters, int numOfBuilders, char *in
     // Send merged words to each builder
     for (int b = 0; b < numOfBuilders; b++) {
         if (builderBuffers[b] != NULL && builderBufferSizes[b] > 0) {
-            // Send the size of the buffer first
-            int n = builderBufferSizes[b] + 1; // Include null terminator
+            int n = builderBufferSizes[b] + 1;
             if (write(builderPipes[b][1], &n, sizeof(int)) < 0) {
                 perror("Error writing size to pipe");
             }
@@ -164,11 +162,12 @@ void splitter(int splitterIndex, int numOfSplitters, int numOfBuilders, char *in
             if (write(builderPipes[b][1], builderBuffers[b], n) < 0) {
                 perror("Error writing buffer to pipe");
             }
-
+            
             // printf("Splitter %d sends merged words to Builder %d\n", splitterIndex, b);
         }
-        
+        close(builderPipes[b][1]);  // Close the write end of the pipe
     }
+    // printf("Splitter %d finished writing and closed pipe\n", splitterIndex);
 
     // Free allocated memory
     for (int b = 0; b < numOfBuilders; b++) {
