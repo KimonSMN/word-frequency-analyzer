@@ -104,7 +104,6 @@ int main(int argc, char *argv[]) {
         exclusionFileLines++;
     }
 
-
     // Allocate memory for the exclusion list
     char line[64]; // The longest word in most standard English dictionaries has 45 letters.
     char **exclusionList = NULL;
@@ -140,7 +139,6 @@ int main(int argc, char *argv[]) {
 
     //////// CREATE PIPES ////////
    
-
     int builderPipes[numOfBuilders][2];         // Pipes for Splitters & Builders, [][0] for reading by builders, [][1] for writing by splitters
     int builderToRootPipes[numOfBuilders][2];   // Pipes for Builders & Root,      [][0] for reading by root, [][1] for writing by builders
     int builderTimingPipes[numOfBuilders][2];   // Pipes for Builder's time,       [][0] for reading by root, [][1] for writing by builders
@@ -230,32 +228,27 @@ int main(int argc, char *argv[]) {
     struct hash_table *mainTable = create_hash_table(mainTableCapacity);
     
     for (int b = 0; b < numOfBuilders; b++) {
-        close(builderToRootPipes[b][1]); // Close write ends // maybe not needed?
+        close(builderToRootPipes[b][1]);
 
         while(1){
             int n, freq;
 
-            ssize_t nbytes = safe_read(builderToRootPipes[b][0], &n, sizeof(int));
-            if(nbytes < 0){
+            ssize_t result = safe_read(builderToRootPipes[b][0], &n, sizeof(int));
+            if(result < 0){
                 return 1;
-            } else if(nbytes == 0){
+            } else if(result == 0){
                 //EOF
                 break;
             }
-            // if (n == 0) {
-            //     // End marker received
-            //     // printf("Root: Received end marker from Builder %d\n", b);
-            //     break;
-            // }
 
             char *buffer = malloc(n);
 
-            nbytes = safe_read(builderToRootPipes[b][0], buffer, sizeof(char) * n);
-            if(nbytes < 0){
+            result = safe_read(builderToRootPipes[b][0], buffer, sizeof(char) * n);
+            if(result < 0){
                 return 1;
             } 
-            nbytes = safe_read(builderToRootPipes[b][0], &freq, sizeof(int));
-            if(nbytes < 0){
+            result = safe_read(builderToRootPipes[b][0], &freq, sizeof(int));
+            if(result < 0){
                 return 1;
             } 
 
@@ -274,11 +267,11 @@ int main(int argc, char *argv[]) {
     for (int b = 0; b < numOfBuilders; b++) {
         double elapsed_time;
 
-        ssize_t nbytes = read(builderTimingPipes[b][0], &elapsed_time, sizeof(double));
-        if (nbytes < 0) {
+        ssize_t result = read(builderTimingPipes[b][0], &elapsed_time, sizeof(double));
+        if (result < 0) {
             perror("Error: Reading time information failed.");
             exit(1);
-        } else if (nbytes == 0) {
+        } else if (result == 0) {
             printf("No time information received from Builder: %d\n", b);
             continue;
         }

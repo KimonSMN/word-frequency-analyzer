@@ -15,8 +15,8 @@
 
 void builder(int builderIndex, int numOfBuilders, int builderPipes[numOfBuilders][2], int builderToRootPipes[numOfBuilders][2], int inputFileLines, int builderTimingPipes[numOfBuilders][2]) {
 
-    clock_t start = clock();
-    
+    clock_t startClock = clock();
+
     // Initialize Hash Table. 
     int wordsPerBuilder = (inputFileLines * 10) / numOfBuilders;    // Approximately 10 words per line.
     int uniqueWords = wordsPerBuilder * 0.5;                        // 50% of the words are unique.
@@ -26,18 +26,22 @@ void builder(int builderIndex, int numOfBuilders, int builderPipes[numOfBuilders
     // Initialize variables.
     char *buffer = NULL;
 
-    
+
     while (1) { // It loops until EOF, or until something goes wrong.
         int n;
-        ssize_t nbytes = safe_read(builderPipes[builderIndex][0], &n, sizeof(int));  // Read the size n of the incoming data
-        if (nbytes == 0) {
+        ssize_t result = safe_read(builderPipes[builderIndex][0], &n, sizeof(int));  // Read the size n of the incoming data
+        if (result == 0) {
             break;
-        } else if (nbytes < 0) {
+        } else if (result < 0) {
             perror("Error reading size from pipe");
             exit(1);
-        } else if (nbytes != sizeof(int)) {
+        } else if (result != sizeof(int)) {
             fprintf(stderr, "Partial read of size\n");
             exit(1);
+        }
+
+        if(n == 0){
+            break;
         }
 
         // Allocate buffer to receive the data
@@ -48,15 +52,13 @@ void builder(int builderIndex, int numOfBuilders, int builderPipes[numOfBuilders
         }
 
         // Read the buffer
-        nbytes = safe_read(builderPipes[builderIndex][0], buffer, n);
-        if (nbytes != n) {
+        result = safe_read(builderPipes[builderIndex][0], buffer, n);
+        if (result != n) {
             perror("Error reading buffer from pipe");
             // printf("Word Size: %s, %d\n", buffer, n);
             free(buffer);
             exit(1);
         }
-
-        usleep(1);
 
         // Process the merged words
         char *token;
@@ -69,32 +71,24 @@ void builder(int builderIndex, int numOfBuilders, int builderPipes[numOfBuilders
         }
     }
     send_hash_table_to_root(table, builderToRootPipes[builderIndex][1]);
-    
 
+    clock_t endClock = clock();
 
-   clock_t end = clock();
+    double timeTaken = (double)(endClock - startClock) / CLOCKS_PER_SEC;
 
-
-   double elapsed_time = (double)(end - start) / CLOCKS_PER_SEC; // Calculate elapsed time in seconds
-
-    // Send timing information to the root process
-    if (write(builderTimingPipes[builderIndex][1], &elapsed_time, sizeof(double)) < 0) {
+    // Send timing information to the root process.
+    if (write(builderTimingPipes[builderIndex][1], &timeTaken, sizeof(double)) < 0) {
         perror("Error sending timing information");
         exit(1);
     }
-    close(builderTimingPipes[builderIndex][1]); // Close the write end of the timing pipe
-
-    close(builderPipes[builderIndex][0]); // Close the read end after processing input
-    close(builderToRootPipes[builderIndex][1]); // Close the write end after sending data to the root process
+    close(builderTimingPipes[builderIndex][1]); // Close the write end of the timing pipe.
+    close(builderPipes[builderIndex][0]);       // Close the read end after processing input.
+    close(builderToRootPipes[builderIndex][1]); // Close the write end after sending data to the root process.
 
     // Cleanup
     destroy_hash_table(table); 
-
-    free(buffer);   
-
-
+    free(buffer);
     kill(getppid(), SIGUSR2);
-
 }
 
 

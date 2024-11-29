@@ -12,9 +12,12 @@
 #include "hashtable.h"
 ssize_t safe_read(int fd, void *buffer, size_t n) {
     size_t readSum = 0;
+    char *charbuffer = (char *)buffer;
 
     while (readSum < n) {
-        ssize_t bytesRead = read(fd, buffer, n);
+        charbuffer += readSum;
+        n -= readSum;
+        ssize_t bytesRead = read(fd, charbuffer, n);
         if (bytesRead < 0) {
             if (errno == EINTR) {
                 continue;
@@ -26,8 +29,7 @@ ssize_t safe_read(int fd, void *buffer, size_t n) {
             break; // EOF
         } 
         readSum += bytesRead;
-        buffer += readSum;
-        n -= readSum;
+
     }
     return readSum;
 }

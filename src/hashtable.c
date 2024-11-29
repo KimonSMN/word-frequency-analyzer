@@ -12,20 +12,16 @@ int prime_sizes[] = {53, 97, 193, 389, 769, 1543, 3079, 6151, 12289, 24593, 4915
 
 
 // Hash function
-unsigned long hash(unsigned char *str, int capacity)
+unsigned long hash(unsigned char *str)
 {
     if (str == NULL || *str == '\0') {
         return 0;
-    }
-    if (capacity <= 0) {
-        perror("Error: Capacity is <= than 0.");
-        exit(1);
     }
     unsigned long hash = 5381;
     int c;
     while ((c = *str++))
         hash = ((hash << 5) + hash) + c; /* hash * 33 + c */
-    return hash % capacity;
+    return hash;
 }
 
 struct hash_table *create_hash_table(int capacity){
@@ -52,7 +48,7 @@ void insert_hash_table(struct hash_table *table, char *word) {
         perror("Error: Tried to insert to NULL table OR NULL word");
         exit(1);
     }
-    unsigned long index = hash((unsigned char *)word, table->capacity);
+    unsigned long index = hash((unsigned char *)word) % table->capacity;
 
     struct hash_node *node = table->array[index];
     while (node != NULL) {
@@ -84,7 +80,7 @@ void insert_hash_table_freq(struct hash_table *table, char *word, int freq) {
         perror("Error: Tried to insert to NULL table OR NULL word");
         exit(1);
     }
-    unsigned long index = hash((unsigned char *)word, table->capacity);
+    unsigned long index = hash((unsigned char *)word) % table->capacity;
 
     struct hash_node *node = table->array[index];
     while (node != NULL) {
@@ -117,7 +113,7 @@ struct hash_node *search_hash_table(struct hash_table *table, char *word){
         perror("Error: Tried to search NULL table OR NULL word");
         exit(1);
     }
-    unsigned long index = hash((unsigned char *)word, table->capacity);
+    unsigned long index = hash((unsigned char *)word) % table->capacity;
 
     struct hash_node *node_to_search = table->array[index];
     while (node_to_search != NULL){

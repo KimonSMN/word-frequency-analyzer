@@ -25,27 +25,26 @@ void splitter(int splitterIndex, int numOfSplitters, int numOfBuilders, char *in
     // Initialize buffers.
     // We use calloc to avoid manually setting the values to NULL & 0.
     char **builderBuffers = calloc(numOfBuilders, sizeof(char*));
-    if (builderBuffers == NULL){    // Error handling
+    if (builderBuffers == NULL){    // Error checking.
         perror("Memory allocation failed for builderBuffers");
         exit(1);
     }
 
     size_t *builderBufferSizes = calloc(numOfBuilders, sizeof(size_t));
-    if (builderBufferSizes == NULL){    // Error handling
+    if (builderBufferSizes == NULL){    // Error checking.
         perror("Memory allocation failed for builderBufferSizes");
         exit(1);
     }
 
-    FILE *file = fopen(inputFile, "r"); // open inputFile
+    FILE *file = fopen(inputFile, "r"); // Open inputFile.
     if (file == NULL) {
         perror("Error opening input file");
         exit(1);
     }
-    // int sectionSize = (inputFileLines + numOfSplitters - 1) / numOfSplitters; // Ceil division
     int sectionFrom = splitterIndex * (inputFileLines / numOfSplitters); // Starting section (Splitter starts reading from here).
     int sectionTo = sectionFrom + (inputFileLines / numOfSplitters);     // Ending section  (Splitter ends the reading here).
     if (sectionTo > inputFileLines) {
-        sectionTo = inputFileLines; // Ensure the last splitter processes up to the last line
+        sectionTo = inputFileLines; // Ensure the last splitter processes up to the last line.
     }
 
     // If splitterIndex is the last splitter,
@@ -84,16 +83,15 @@ void splitter(int splitterIndex, int numOfSplitters, int numOfBuilders, char *in
         token = strtok(line, delim);
 
         while (token) {
-            if (isExcluded(token, exclusionList, exclusionListSize)) { // If token excluded skip to the next one
+            if (isExcluded(token, exclusionList, exclusionListSize)) { // If token excluded, skip to the next one.
                 token = strtok(NULL, delim);
                 continue;   
             }
                     
-            // Hash the word to get the builder index
-            unsigned long bucketForWord = hash((unsigned char *)token, 100);
+            // Hash the word to get the builder index.
+            unsigned long bucketForWord = hash((unsigned char *)token);
             int builderIndex = bucketForWord % numOfBuilders;
 
-            
             // Calculate new size
             size_t oldSize = builderBufferSizes[builderIndex];
             size_t tokenLen = strlen(token);
@@ -101,9 +99,9 @@ void splitter(int splitterIndex, int numOfSplitters, int numOfBuilders, char *in
 
             if (builderBufferSizes[builderIndex] == 0) {
                 // First word
-                newSize = oldSize + tokenLen + 1; // +1 for null terminator
+                newSize = oldSize + tokenLen + 1; // +1 for null terminator.
             } else {
-                newSize = oldSize + 1 + tokenLen + 1; // +1 for space, +1 for null terminator
+                newSize = oldSize + 1 + tokenLen + 1; // +1 for space, +1 for null terminator.
             }
 
             char *temp = realloc(builderBuffers[builderIndex], newSize);
@@ -125,38 +123,29 @@ void splitter(int splitterIndex, int numOfSplitters, int numOfBuilders, char *in
                 // First word, no need for space
                 strcpy(builderBuffers[builderIndex], token);
                 builderBufferSizes[builderIndex] = tokenLen;
-
             } else {
                 strcat(builderBuffers[builderIndex], " ");
                 strcat(builderBuffers[builderIndex], token);
                 builderBufferSizes[builderIndex] = oldSize + 1 + tokenLen;
             }
-
-            // printf("Splitter %d queues '%s' for Builder %d\n", splitterIndex, token, builderIndex);
-
             token = strtok(NULL, delim);
-
         }
     }
 
-    // Send merged words to each builder
+    // Send merged words to each builder.
     for (int b = 0; b < numOfBuilders; b++) {
         if (builderBuffers[b] != NULL && builderBufferSizes[b] > 0) {
             int n = builderBufferSizes[b] + 1;
-            if (write(builderPipes[b][1], &n, sizeof(int)) < 0) {
+            if (write(builderPipes[b][1], &n, sizeof(int)) < 0) { // Send buffer size.
                 perror("Error writing size to pipe");
             }
 
-            // Send the buffer
-            if (write(builderPipes[b][1], builderBuffers[b], n) < 0) {
+            if (write(builderPipes[b][1], builderBuffers[b], n) < 0) { // Send the buffer.
                 perror("Error writing buffer to pipe");
             }
-            
-            // printf("Splitter %d sends merged words to Builder %d\n", splitterIndex, b);
         }
         close(builderPipes[b][1]);  // Close the write end of the pipe
     }
-    // printf("Splitter %d finished writing and closed pipe\n", splitterIndex);
 
     // Free allocated memory
     for (int b = 0; b < numOfBuilders; b++) {
@@ -166,7 +155,5 @@ void splitter(int splitterIndex, int numOfSplitters, int numOfBuilders, char *in
     free(builderBufferSizes);
     free(line);
     fclose(file);
-
     kill(getppid(), SIGUSR1);
-
 }
