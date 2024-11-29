@@ -10,25 +10,7 @@
 
 #include "hashtable.h"
 #include "helper.h"
-void trim_newline(char *str) {
-    size_t len = strlen(str);
-    if (len > 0 && (str[len - 1] == '\n' || str[len - 1] == '\r')) {
-        str[len - 1] = '\0';
-    }
-}
 
-void clean_text(char *str) {
-    
-    size_t len = strlen(str);
-    int j = 0; // Index for the updated string
-
-    for (int i = 0; i < len; i++) {
-        if((str[i] >= 65 && str[i] <= 90 || str[i] >= 97 && str[i] <= 122 || str[i] == ' ')) {
-            str[j++] = str[i]; // Copy it to the new position
-        }
-    }
-    str[j] = '\0';
-}
 bool isExcluded(char *word, char *exclusionList[], int exclusionListSize){
     for (int i = 0; i < exclusionListSize; i++) {
         if (strcmp(word, exclusionList[i]) == 0) {
@@ -59,7 +41,7 @@ void splitter(int splitterIndex, int numOfSplitters, int numOfBuilders, char *in
         perror("Error opening input file");
         exit(1);
     }
-    int sectionSize = (inputFileLines + numOfSplitters - 1) / numOfSplitters; // Ceil division
+    // int sectionSize = (inputFileLines + numOfSplitters - 1) / numOfSplitters; // Ceil division
     int sectionFrom = splitterIndex * (inputFileLines / numOfSplitters); // Starting section (Splitter starts reading from here).
     int sectionTo = sectionFrom + (inputFileLines / numOfSplitters);     // Ending section  (Splitter ends the reading here).
     if (sectionTo > inputFileLines) {
@@ -77,7 +59,8 @@ void splitter(int splitterIndex, int numOfSplitters, int numOfBuilders, char *in
     char *line = NULL;
     for (int currentLine = 0; currentLine < sectionFrom; currentLine++) {
         if (getline(&line, &len, file) == -1) {
-            perror("Error skipping lines");
+            perror("Error: Skipping lines failed");
+            free(line);
             fclose(file);
             exit(1);
         }
@@ -89,12 +72,13 @@ void splitter(int splitterIndex, int numOfSplitters, int numOfBuilders, char *in
     
     for (int i = sectionFrom; i < sectionTo; i++) {
         if (getline(&line, &len, file) == -1) {
-            perror("Error reading line");
+            perror("Error: Reading line failed");
+            free(line);
             fclose(file);
             exit(1);
         }
 
-        clean_text(line);
+        clean_string(line);
         trim_newline(line);
         
         token = strtok(line, delim);
@@ -106,7 +90,7 @@ void splitter(int splitterIndex, int numOfSplitters, int numOfBuilders, char *in
             }
                     
             // Hash the word to get the builder index
-            unsigned long bucketForWord = hash(token, 100);
+            unsigned long bucketForWord = hash((unsigned char *)token, 100);
             int builderIndex = bucketForWord % numOfBuilders;
 
             
@@ -123,9 +107,14 @@ void splitter(int splitterIndex, int numOfSplitters, int numOfBuilders, char *in
             }
 
             char *temp = realloc(builderBuffers[builderIndex], newSize);
-            if (temp == NULL) { // In case were realloc failed 
-                perror("Realloc failed");   // print error
-                free(line); // free 
+            if (temp == NULL) { // Error checking. 
+                perror("Error: Realloc failed");
+                for (int b = 0; b < numOfBuilders; b++) {
+                    free(builderBuffers[b]);
+                }
+                free(builderBuffers);
+                free(builderBufferSizes);
+                free(line);
                 fclose(file);
                 exit(1);
             }

@@ -1,3 +1,10 @@
 the: 7748
 was: 2808
 had: 2084
+said: 1345
+were: 787
+Mr: 708
+Joe: 684
+been: 608
+is: 593
+an: 432

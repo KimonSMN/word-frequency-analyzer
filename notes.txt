@@ -1,5 +1,0 @@
-need to make readme file
-need to send sigusr1 & sigusr2 signals ✅
-need to pass elapsed time through a pipe from builders to root  ✅
-need to fix low number of splitters and builders not working. ? idk man fr fr now
-idk thats it for now

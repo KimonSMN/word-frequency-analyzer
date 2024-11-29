@@ -1,20 +1,25 @@
 # Compiler
-CC = gcc
+CC = gcc 
 
 # Compiler flags
-CFLAGS =  
+CFLAGS = -Wall -Wextra -Iinclude
 
 # Output executable name
 TARGET = lexan
 
-# Source files
-SRC = lexan.c hashtable.c splitter.c builder.c helper.c
+# Directories
+SRC_DIR = src
+BUILD_DIR = build
+INCLUDE_DIR = include
 
-# Object files (replace .c with .o)
+# Source files
+SRC = $(SRC_DIR)/lexan.c $(SRC_DIR)/hashtable.c $(SRC_DIR)/splitter.c $(SRC_DIR)/builder.c $(SRC_DIR)/helper.c
+
+# Object files
 OBJ = $(SRC:.c=.o)
 
 # Header files
-HEADERS = hashtable.h splitter.h builder.h helper.h
+HEADERS = $(INCLUDE_DIR)hashtable.h $(INCLUDE_DIR)splitter.h $(INCLUDE_DIR)builder.h $(INCLUDE_DIR)helper.h
 
 # Build the target executable
 all: $(TARGET)

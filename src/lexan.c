@@ -10,7 +10,6 @@
 #include <signal.h>
 #include <bits/sigaction.h>
 
-
 #include "splitter.h"
 #include "builder.h"
 #include "helper.h"
@@ -26,42 +25,12 @@ void handle_sigusr(int signal){
     } else if (signal == SIGUSR2) {
         completedBuilders++;
     }
-
-}
-
-
-// https://stackoverflow.com/questions/122616/how-do-i-trim-leading-trailing-whitespace-in-a-standard-way?page=1&tab=scoredesc#tab-top
-char *trimwhitespace(char *str)
-{
-    char *end;
-
-    // Trim leading space
-    while(isspace((unsigned char)*str)) str++;
-
-    if(*str == 0)  // All spaces?
-    return str;
-
-    // Trim trailing space
-    end = str + strlen(str) - 1;
-    while(end > str && isspace((unsigned char)*end)) end--;
-
-    // Write new null terminator character
-    end[1] = '\0';
-
-    return str;
-}
-
-// Compare Function for qsort()
-int compare_frequency(const void *a, const void *b) {
-    struct hash_node *nodeA = *(struct hash_node **)a;
-    struct hash_node *nodeB = *(struct hash_node **)b;
-    return nodeB->count - nodeA->count; // Decending order.
 }
 
 int main(int argc, char *argv[]) {
 
     //////// HANDLE COMMAND LINE ARGUMENTS ////////
-    
+
     char *inputFileName = NULL;
     int numOfSplitters = 0;
     int numOfBuilders = 0;
@@ -69,14 +38,13 @@ int main(int argc, char *argv[]) {
     char *exclusionFileName = NULL;
     char *outputFileName = NULL;
 
-    // Parse the arguments
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "-i") == 0) {
             inputFileName = argv[++i];
         } else if (strcmp(argv[i], "-l") == 0) {
-            numOfSplitters = atoi(argv[++i]);        // Number of Splitters initialized in the command line
+            numOfSplitters = atoi(argv[++i]);
         } else if (strcmp(argv[i], "-m") == 0) {
-            numOfBuilders = atoi(argv[++i]);        // Number of Builders initialized in the command line
+            numOfBuilders = atoi(argv[++i]);
         } else if (strcmp(argv[i], "-t") == 0) {
             topK = atoi(argv[++i]);
         } else if (strcmp(argv[i], "-e") == 0) {
@@ -89,15 +57,12 @@ int main(int argc, char *argv[]) {
         }
     }
 
-
     //////// HANDLE SIGNALS ////////
     struct sigaction sa;
     sa.sa_handler = &handle_sigusr;
     sa.sa_flags = 0;
     sigaction(SIGUSR1, &sa, NULL);
     sigaction(SIGUSR2, &sa, NULL);
-
-
 
     //////// READ INPUT FILE LINES ////////
     FILE *inputFile = fopen(inputFileName, "r");    // Open inputFile for reading.
@@ -215,6 +180,7 @@ int main(int argc, char *argv[]) {
     }
 
     //////// FORK BUILDERS ////////
+
     for (int b = 0; b < numOfBuilders; b++) {
         int pid = fork();
         if (pid == -1) {
@@ -235,49 +201,39 @@ int main(int argc, char *argv[]) {
                 }
             }
 
-            // Now builder can use builderPipes[b][0] to read from splitters
-            // And builderToRootPipes[b][1] to write to root
             builder(b, numOfBuilders, builderPipes, builderToRootPipes, inputFileLines, builderTimingPipes);
 
             close(builderPipes[b][0]);
             close(builderToRootPipes[b][1]);
 
-            // Exit after processing
-            return 1;
+            return 1;   // Exit after processing.
         }
-
     }
 
-    // Cloes all pipe ends
+    // Close all pipe ends.
     for (int b = 0; b < numOfBuilders; b++) {
         close(builderPipes[b][0]);
         close(builderPipes[b][1]);
-        close(builderToRootPipes[b][1]); // Close write ends in root
-        close(builderTimingPipes[b][1]);
-
+        close(builderToRootPipes[b][1]);    // Close only write, we still use read end.
+        close(builderTimingPipes[b][1]);    // Close only write, we still use read end.
     }
 
-
-    // wait for all child processes to finish execution
+    // Wait for all child processes to finish execution.
     for (int i = 0; i < numOfSplitters + numOfBuilders; i++) {
         wait(NULL);
     }
 
+    //////// INITIALIZE HASHTABLE ////////
 
-    // PARENT PROCESS
-
-    // CREATING THE MAIN HASHTABLE
-
-    int wordsPerBuilder = (inputFileLines * 10) / numOfBuilders; // Approximately 10 words per line
-    int mainTableCapacity = get_hash_table_capacity(wordsPerBuilder * numOfBuilders); // Scale for all builders
+    int wordsPerBuilder = (inputFileLines * 10) / numOfBuilders; // Approximately 10 words per line.
+    int mainTableCapacity = get_hash_table_capacity(wordsPerBuilder * numOfBuilders);   // This function finds "good" hashtable sizes.
     struct hash_table *mainTable = create_hash_table(mainTableCapacity);
     
     for (int b = 0; b < numOfBuilders; b++) {
-        close(builderToRootPipes[b][1]); // Close write ends in root
+        close(builderToRootPipes[b][1]); // Close write ends // maybe not needed?
 
         while(1){
-            int n;
-            int freq;
+            int n, freq;
 
             ssize_t nbytes = safe_read(builderToRootPipes[b][0], &n, sizeof(int));
             if(nbytes < 0){
@@ -286,11 +242,12 @@ int main(int argc, char *argv[]) {
                 //EOF
                 break;
             }
-            if (n == 0) {
-                // End marker received
-                // printf("Root: Received end marker from Builder %d\n", b);
-                break;
-            }
+            // if (n == 0) {
+            //     // End marker received
+            //     // printf("Root: Received end marker from Builder %d\n", b);
+            //     break;
+            // }
+
             char *buffer = malloc(n);
 
             nbytes = safe_read(builderToRootPipes[b][0], buffer, sizeof(char) * n);
@@ -330,8 +287,8 @@ int main(int argc, char *argv[]) {
 
         close(builderTimingPipes[b][0]); // Close the read end of the timing pipe
     }
-    // Find top-k
 
+    // Find top-k
     int totalWords = 0;
 
     for(int i =0; i < mainTable->capacity; i++){
@@ -348,7 +305,6 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    // Populate the array
     int idx = 0;
     for (int i = 0; i < mainTable->capacity; i++) {
         struct hash_node *node = mainTable->array[i];
@@ -360,19 +316,19 @@ int main(int argc, char *argv[]) {
 
     qsort(word_array, totalWords, sizeof(struct hash_node *), compare_frequency);
 
-    // print_hash_table(mainTable);
-
-    FILE *filePtr = fopen("output.txt", "w"); 
+    FILE *filePtr = fopen(outputFileName, "w"); // Open output file for writing.
     for (int i = 0; i < topK && i < totalWords; i++) {
-        fprintf(filePtr,"%s: %d\n", word_array[i]->word, word_array[i]->count);
+        fprintf(filePtr,"%s: %d\n", word_array[i]->word, word_array[i]->count); // Write top-k words to output file.
     }
 
-    printf("Splitter signals: %d\n", completedSplitters);
-    printf("Builder signals: %d\n", completedBuilders);
+    printf("Splitter signals received: %d\n", completedSplitters);
+    printf("Builder signals received: %d\n", completedBuilders);
 
-    fclose(filePtr);
+    fclose(filePtr);    // Close output file.
+
     free(word_array);
-    destroy_hash_table(mainTable);
     free(exclusionList);
+    destroy_hash_table(mainTable);
+
     return 0;
 }

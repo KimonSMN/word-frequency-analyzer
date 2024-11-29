@@ -14,23 +14,45 @@ int prime_sizes[] = {53, 97, 193, 389, 769, 1543, 3079, 6151, 12289, 24593, 4915
 // Hash function
 unsigned long hash(unsigned char *str, int capacity)
 {
+    if (str == NULL || *str == '\0') {
+        return 0;
+    }
+    if (capacity <= 0) {
+        perror("Error: Capacity is <= than 0.");
+        exit(1);
+    }
     unsigned long hash = 5381;
     int c;
-    while (c = *str++)
+    while ((c = *str++))
         hash = ((hash << 5) + hash) + c; /* hash * 33 + c */
     return hash % capacity;
 }
 
 struct hash_table *create_hash_table(int capacity){
     struct hash_table *table = malloc(sizeof(struct hash_table));
+    if (table == NULL){     // Error checking.
+        perror("Error: Memory allocation for hash table failed.");
+        exit(1);
+    }
     table->capacity = capacity;
-    table->array = calloc(capacity, sizeof(struct hash_node*));    
+    if (capacity <= 0) {    // Error checking.
+        perror("Error: Capacity is <= than 0.");
+        exit(1);
+    }
+    table->array = calloc(capacity, sizeof(struct hash_node*));
+    if(table->array == NULL){   // Error checking.
+        perror("Error: Memory allocation for hash table array failed.");
+        exit(1);
+    }
     return table;
 }
 
 void insert_hash_table(struct hash_table *table, char *word) {
-
-    unsigned long index = hash(word, table->capacity);
+    if (table == NULL || word == NULL) { // Error checking.
+        perror("Error: Tried to insert to NULL table OR NULL word");
+        exit(1);
+    }
+    unsigned long index = hash((unsigned char *)word, table->capacity);
 
     struct hash_node *node = table->array[index];
     while (node != NULL) {
@@ -42,15 +64,27 @@ void insert_hash_table(struct hash_table *table, char *word) {
     }
 
     struct hash_node *new_node = malloc(sizeof(struct hash_node));
+    if (new_node == NULL){  // Error checking.
+        perror("Error: Memory allocation for new node failed.");
+        exit(1);
+    }
     new_node->word = strdup(word);
+    if(new_node->word == NULL){ // Error checking.
+        perror("Error: Duplication of word failed.");
+        free(new_node);
+        exit(1);
+    }
     new_node->count = 1;
     new_node->next = table->array[index];
     table->array[index] = new_node;
 }
 
 void insert_hash_table_freq(struct hash_table *table, char *word, int freq) {
-
-    unsigned long index = hash(word, table->capacity);
+    if (table == NULL || word == NULL) {    // Error checking.
+        perror("Error: Tried to insert to NULL table OR NULL word");
+        exit(1);
+    }
+    unsigned long index = hash((unsigned char *)word, table->capacity);
 
     struct hash_node *node = table->array[index];
     while (node != NULL) {
@@ -62,7 +96,16 @@ void insert_hash_table_freq(struct hash_table *table, char *word, int freq) {
     }
 
     struct hash_node *new_node = malloc(sizeof(struct hash_node));
+    if (new_node == NULL){  // Error checking.
+        perror("Error: Memory allocation for new node failed.");
+        exit(1);
+    }
     new_node->word = strdup(word);
+    if(new_node->word == NULL){ // Error checking.
+        perror("Error: Duplication of word failed.");
+        free(new_node);
+        exit(1);
+    }
     new_node->count = freq;
     new_node->next = table->array[index];
     table->array[index] = new_node;
@@ -70,7 +113,11 @@ void insert_hash_table_freq(struct hash_table *table, char *word, int freq) {
 
 
 struct hash_node *search_hash_table(struct hash_table *table, char *word){
-    unsigned long index = hash(word, table->capacity);
+    if (table == NULL || word == NULL) {    // Error checking.
+        perror("Error: Tried to search NULL table OR NULL word");
+        exit(1);
+    }
+    unsigned long index = hash((unsigned char *)word, table->capacity);
 
     struct hash_node *node_to_search = table->array[index];
     while (node_to_search != NULL){
@@ -83,6 +130,9 @@ struct hash_node *search_hash_table(struct hash_table *table, char *word){
 }
 
 void destroy_hash_table(struct hash_table *table){
+    if (table == NULL) {    // Error checking.
+        return;
+    }
     for (int i = 0; i < table->capacity; i++) {
         struct hash_node *current_node = table->array[i];
 
@@ -101,52 +151,48 @@ void print_hash_table(struct hash_table *table) {
 
     for (int i = 0; i < table->capacity; i++) {
         struct hash_node *node = table->array[i];  
-
         if (node != NULL) {
             printf("Bucket %d:\n", i);
         }
-
         while (node != NULL) {
             printf("\tWord: %s Frequency: %d\n", node->word, node->count);
-            
             node = node->next;
-            
         }
     }
 }
 
-
 void send_hash_table_to_root(struct hash_table *table, int writeFd){
+    if (table == NULL) {    // Error checking.
+        perror("Error: Table is empty.");
+        exit(1);
+    }
     for (int i = 0; i < table->capacity; i++){
         struct hash_node *node = table->array[i];
         while(node != NULL){
-            // printf("Builder is sending word: %s, frequency: %d\n", node->word, node->count);
 
             int n = strlen(node->word) + 1;
-            if(write(writeFd ,&n, sizeof(int)) != sizeof(int)){
-                perror("Error writing word length");
-                exit(EXIT_FAILURE);
+            if(write(writeFd ,&n, sizeof(int)) <= 0){ 
+                perror("Error writing word length");// Error checking.
+                exit(1);
             }
 
-            if(write(writeFd, node->word, sizeof(char) * n) != n){
-                perror("Error writing word");
-                exit(EXIT_FAILURE);
+            if(write(writeFd, node->word, sizeof(char) * n) <= 0){
+                perror("Error writing word");       // Error checking.
+                exit(1);
             }
             
-            if(write(writeFd, &node->count, sizeof(int)) != sizeof(int)){
-                perror("Error writing frequency");
-                exit(EXIT_FAILURE);
+            if(write(writeFd, &node->count, sizeof(int)) <= 0){
+                perror("Error writing frequency");  // Error checking.
+                exit(1);
             }
-
             node = node->next;
         }
     }
-    int end_marker = 0;
-    if (write(writeFd, &end_marker, sizeof(int)) != sizeof(int)) {
-        perror("Error writing end marker");
+    int endMarker = 0;
+    if (write(writeFd, &endMarker, sizeof(int)) < 0) {
+        perror("Error writing end marker"); // Error checking.
         exit(1);
     }
-    
 }
 
 int get_hash_table_capacity(int wordsPerBuilder){
@@ -156,4 +202,5 @@ int get_hash_table_capacity(int wordsPerBuilder){
             return prime_sizes[i];
         }
     }
+    return prime_sizes[len - 1];
 }
