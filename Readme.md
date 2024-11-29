@@ -18,4 +18,4 @@ Top-k:
 
 cd/lexan
 make
-./lexan -i test.txt -l 4 -m 4 -t 3 -e ExclusionList1_a.txt -o output.txt (Αυτη ειναι μια κλήση που τρέχει σωστά).
+./lexan -i GreatExpectations_a.txt -l 4 -m 4 -t 3 -e ExclusionList1_a.txt -o output.txt (Αυτη ειναι μια κλήση που τρέχει σωστά).
