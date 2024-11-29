@@ -26,7 +26,6 @@ void builder(int builderIndex, int numOfBuilders, int builderPipes[numOfBuilders
     // Initialize variables.
     char *buffer = NULL;
 
-
     while (1) { // It loops until EOF, or until something goes wrong.
         int n;
         ssize_t result = safe_read(builderPipes[builderIndex][0], &n, sizeof(int));  // Read the size n of the incoming data
@@ -55,7 +54,6 @@ void builder(int builderIndex, int numOfBuilders, int builderPipes[numOfBuilders
         result = safe_read(builderPipes[builderIndex][0], buffer, n);
         if (result != n) {
             perror("Error reading buffer from pipe");
-            // printf("Word Size: %s, %d\n", buffer, n);
             free(buffer);
             exit(1);
         }

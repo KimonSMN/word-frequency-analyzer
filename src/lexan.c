@@ -77,7 +77,7 @@ int main(int argc, char *argv[]) {
 
     while (getline(&inputLine, &len, inputFile) != -1) {
 
-        trimwhitespace(inputLine);  // Trims the white-space of the inputFile.
+        trim_space(inputLine);  // Trims the white-space of the inputFile.
 
         if (inputLine[0] != '\0') { // If the line isn't empty, then
             inputFileLines++;       // increment inputFileLine.
@@ -119,7 +119,7 @@ int main(int argc, char *argv[]) {
     rewind(exclusionFile);  // Rewind the file.
     while (i < exclusionFileLines && fgets(line, sizeof(line), exclusionFile)) {
         line[strcspn(line, "\r\n")] = '\0'; // Remove newline character
-        trimwhitespace(line);
+        trim_space(line);
 
         exclusionList[i] = strdup(line);    // Create a copy of line, and set it as element 'i'.
         if (exclusionList[i] == NULL) {     // Error checking.

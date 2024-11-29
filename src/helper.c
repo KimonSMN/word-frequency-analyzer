@@ -22,14 +22,13 @@ ssize_t safe_read(int fd, void *buffer, size_t n) {
             if (errno == EINTR) {
                 continue;
             }
-            perror("Error: safe read failed.");
+            perror("Error: Safe read failed.");
             exit(1);
         }
         if (bytesRead == 0){
-            break; // EOF
+            break;
         } 
         readSum += bytesRead;
-
     }
     return readSum;
 }
@@ -55,27 +54,26 @@ void clean_string(char *str) {
     str[index] = '\0';
 }
 
-// https://stackoverflow.com/questions/122616/how-do-i-trim-leading-trailing-whitespace-in-a-standard-way?page=1&tab=scoredesc#tab-top
-char *trimwhitespace(char *str){
-    char *end;
+char *trim_space(char *str){
+    
+    while(isspace((unsigned char)*str)){
+        str++;
+    }
 
-    // Trim leading space
-    while(isspace((unsigned char)*str)) str++;
+    if(*str == '\0'){
+        return str;
+    }
 
-    if(*str == 0)  // All spaces?
-    return str;
+    char *end = str + strlen(str) - 1;
+    while(end > str && isspace((unsigned char)*end)){
+        end--;
+    }
 
-    // Trim trailing space
-    end = str + strlen(str) - 1;
-    while(end > str && isspace((unsigned char)*end)) end--;
-
-    // Write new null terminator character
     end[1] = '\0';
-
     return str;
 }
 
-// Compare Function for qsort()
+// Compare Function for qsort().
 int compare_frequency(const void *a, const void *b) {
     struct hash_node *nodeA = *(struct hash_node **)a;
     struct hash_node *nodeB = *(struct hash_node **)b;

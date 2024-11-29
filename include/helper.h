@@ -8,7 +8,7 @@ void trim_newline(char *str);
 
 void clean_string(char *str);
 
-char *trimwhitespace(char *str);
+char *trim_space(char *str);
 
 int compare_frequency(const void *a, const void *b);
 #endif

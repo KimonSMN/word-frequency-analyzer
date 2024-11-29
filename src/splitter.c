@@ -92,16 +92,15 @@ void splitter(int splitterIndex, int numOfSplitters, int numOfBuilders, char *in
             unsigned long bucketForWord = hash((unsigned char *)token);
             int builderIndex = bucketForWord % numOfBuilders;
 
-            // Calculate new size
+            // Calculate new size.
             size_t oldSize = builderBufferSizes[builderIndex];
             size_t tokenLen = strlen(token);
             size_t newSize;
 
             if (builderBufferSizes[builderIndex] == 0) {
-                // First word
-                newSize = oldSize + tokenLen + 1; // +1 for null terminator.
+                newSize = oldSize + tokenLen + 1; // First word, add +1 for null terminator.
             } else {
-                newSize = oldSize + 1 + tokenLen + 1; // +1 for space, +1 for null terminator.
+                newSize = oldSize + 1 + tokenLen + 1; // Not first word, add +1 for space and +1 for null terminator.
             }
 
             char *temp = realloc(builderBuffers[builderIndex], newSize);
@@ -118,9 +117,8 @@ void splitter(int splitterIndex, int numOfSplitters, int numOfBuilders, char *in
             }
             builderBuffers[builderIndex] = temp;
 
-            // Append the word and a space (or newline)
             if (builderBufferSizes[builderIndex] == 0) {
-                // First word, no need for space
+                // First word, no space needed.
                 strcpy(builderBuffers[builderIndex], token);
                 builderBufferSizes[builderIndex] = tokenLen;
             } else {
