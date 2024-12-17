@@ -1,21 +1,56 @@
-Splitters & Builders:
+# **Lexan**  
+### Word Frequency Analyzer
 
-Οι splitters διαβάζουν τμήματα του input file. Έπειτα τα επεξεργάζονται και στέλνουν αυτά τα τμήματα ανά λέξη σε συγκεκριμένους builders που καθορίζονται μέσω μιας hash function. Στη συνέχεια, οι builders διαβάζουν τις λέξεις που έλαβαν και τις προσθέτουν σε ενα hash table που περιέχει τη λέξη και τη συχνότητα της. Στο τέλος, στέλνουν το hash table με τις λέξεις στο root (lexan) για περαιτέρω επεξεργασία, καθώς και ένα σήμα ότι ολοκλήρωσαν τη δουλειά τους.
+**Lexan** is a text analysis tool that identifies the **top-k most frequent words** in a given input file. It employs a **master-worker architecture** with three types of processes: **splitters**, **builders**, and a **root** process for efficient computation.
 
-Root (lexan):
+## **Features**  
+- **Parallel Processing**: Distributes text analysis across multiple processes to enhance performance.  
+- **Word Frequency Analysis**: Computes the frequency of each word in an input file.  
+- **Top-k Words Identification**: Outputs the k most frequent words, where k is user-defined.  
 
-Το lexan.c περιμένει μέχρι να ολοκληρωθούν όλες οι διεργασίες. Έπειτα λαμβάνει τις πληροφορίες που έστειλαν οι builders και, χρησιμοποιώντας μια συνάρτηση qsort, βρίσκει τις top-k λέξεις (ο αριθμός k ορίζεται από τον χρήστη στη γραμμή εκτέλεσης) που εμφανίζονται τις περισσότερες φορές στο κείμενο του αρχείου εισόδου.
+## **Architecture**  
+The system is composed of the following components:  
 
-Προβλήματα:
+1. **Splitters**  
+   - Reads segments of the input file.  
+   - Processes text and sends words to **builders** using a hash function.  
 
-Το πρόγραμμα λειτουργεί ιδανικά με λίγους splitters και builders (π.χ. 4 & 4). Δυστυχώς, όταν υπάρχει μόνο ένας splitter, το πρόγραμμα δεν λειτουργεί όπως θα έπρεπε (το ίδιο συμβαίνει και με έναν builder), καθώς και όταν αυξηθεί σημαντικά ο αριθμός των splitters.
+2. **Builders**  
+   - Receives words from splitters.  
+   - Updates a hash table to track word frequencies.  
+   - Sends results to the **root** process.  
 
-Top-k:
+3. **Root (lexan)**  
+   - Aggregates data from all builders.  
+   - Sorts the word frequencies.  
+   - Outputs the **top-k most frequent words**.  
 
-Επέλεξα οι top-k λέξεις, με τον αριθμό k να ορίζεται από τον χρήστη κατά την κλήση του προγράμματος, να μετρούν παρόμοιες λέξεις όπως 'The' και 'the' ως διαφορετικές.
 
-Για να τρέξετε το πρόγραμμα:
+## **Usage**
 
-cd/lexan
+### Compilation  
+Use the provided Makefile to compile the project:  
+```bash
 make
-./lexan -i GreatExpectations_a.txt -l 4 -m 4 -t 3 -e ExclusionList1_a.txt -o output.txt (Αυτη ειναι μια κλήση που τρέχει σωστά).
+```
+
+### Execution  
+To run the program:  
+```bash
+./lexan -i TextFile -l numOfSplitter -m numOfBuilders -t TopPopular -e ExclusionList -o OutputFile
+```  
+
+### Example  
+```bash
+./lexan input.txt 4 4 10 exclusion.txt output.txt 
+```  
+This will output the **top 10 most frequent words** in `example.txt`.  
+
+## **Files**  
+- `lexan.c`: Main root process implementation.  
+- `splitter.c`: Implementation of the splitter processes.  
+- `builder.c`: Implementation of the builder processes.  
+- `Makefile`: Compilation script.  
+
+## **License**  
+This project is open-source. Feel free to use and modify it.
