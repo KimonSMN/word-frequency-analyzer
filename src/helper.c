@@ -10,6 +10,32 @@
 #include <ctype.h>
 
 #include "hashtable.h"
+#include "helper.h"
+
+int count_lines(const char* filename) {
+    
+    FILE *fp = fopen(filename, "r"); 
+    if (!fp) {
+        perror("Error: Opening file for reading failed");
+        return -1;
+    }
+
+    int numOfLines = 0;
+    char buffer[BUFFER_SIZE];
+    size_t bytes_read;
+
+    while ((bytes_read = fread(buffer, 1, sizeof(buffer), fp)) > 0){
+        for (size_t i = 0; i < bytes_read; i++) {
+            if (buffer[i] == '\n') 
+                numOfLines++;
+        }
+    }
+
+    fclose(fp);
+    return numOfLines + 1;
+}
+
+
 ssize_t safe_read(int fd, void *buffer, size_t n) {
     size_t readSum = 0;
     char *charbuffer = (char *)buffer;

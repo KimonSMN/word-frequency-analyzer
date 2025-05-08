@@ -25,6 +25,8 @@
     "helper.h": "c",
     "stdbool.h": "c",
     "splitter.h": "c",
-    "sigaction.h": "c"
+    "sigaction.h": "c",
+    "builder.h": "c",
+    "ctype.h": "c"
   }
 }

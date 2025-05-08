@@ -12,8 +12,11 @@ struct hash_node {  // Κόμβος του hash-table
     struct hash_node *next; // Pointer στον επόμενο hash_node στο ίδιο bucket. // Seperate Chaining
 };
 
+/* djb2 hash function. */
 unsigned long hash(unsigned char *str);
 
+/* Initialize the hash-table. Set cap based on `capacity`.
+Returns an empty hash-table. */
 struct hash_table *create_hash_table(int capacity);
 
 void insert_hash_table(struct hash_table *table, char *word);
