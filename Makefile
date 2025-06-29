@@ -1,5 +1,5 @@
 # Compiler
-CC = gcc 
+CC = gcc
 
 # Compiler flags
 CFLAGS = -Wall -Wextra -Iinclude
@@ -8,43 +8,50 @@ CFLAGS = -Wall -Wextra -Iinclude
 SRC_DIR = src
 BUILD_DIR = build
 INCLUDE_DIR = include
-BUILD_DIR = build
 BIN_DIR = bin
+
 # Source files
-SRC = $(SRC_DIR)/lexan.c \
-      $(SRC_DIR)/hashtable.c \
-      $(SRC_DIR)/splitter.c \
-      $(SRC_DIR)/builder.c \
-      $(SRC_DIR)/helper.c
+COMMON_SRC = $(SRC_DIR)/hashtable.c \
+             $(SRC_DIR)/helper.c
+
+LEXAN_SRC = $(SRC_DIR)/lexan.c
+SPLITTER_SRC = $(SRC_DIR)/splitter.c
+BUILDER_SRC = $(SRC_DIR)/builder.c
 
 # Object files
-OBJECTS = $(BUILD_DIR)/lexan.o \
-          $(BUILD_DIR)/hashtable.o \
-          $(BUILD_DIR)/splitter.o \
-          $(BUILD_DIR)/builder.o \
-          $(BUILD_DIR)/helper.o
+COMMON_OBJ = $(COMMON_SRC:$(SRC_DIR)/%.c=$(BUILD_DIR)/%.o)
+LEXAN_OBJ = $(BUILD_DIR)/lexan.o
+SPLITTER_OBJ = $(BUILD_DIR)/splitter.o
+BUILDER_OBJ = $(BUILD_DIR)/builder.o
 
-# Output executable name
-TARGET = $(BIN_DIR)/lexan
- 
-# Header files
-HEADERS = $(INCLUDE_DIR)hashtable.h $(INCLUDE_DIR)splitter.h $(INCLUDE_DIR)builder.h $(INCLUDE_DIR)helper.h
+# Executables
+LEXAN_EXE = $(BIN_DIR)/lexan
+SPLITTER_EXE = $(BIN_DIR)/splitter
+BUILDER_EXE = $(BIN_DIR)/builder
 
-# Build the target executable
-all: $(TARGET)
+# Default target
+all: $(LEXAN_EXE) $(SPLITTER_EXE) $(BUILDER_EXE)
 
-$(TARGET): $(OBJECTS)
+# Executable rules
+$(LEXAN_EXE): $(COMMON_OBJ) $(LEXAN_OBJ)
 	@mkdir -p $(BIN_DIR)
-	$(CC) $(CFLAGS) -o $@ $(OBJECTS)
+	$(CC) $(CFLAGS) -o $@ $^
 
-# Compile .c files into .o files
+$(SPLITTER_EXE): $(COMMON_OBJ) $(SPLITTER_OBJ)
+	@mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) -o $@ $^
+
+$(BUILDER_EXE): $(COMMON_OBJ) $(BUILDER_OBJ)
+	@mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) -o $@ $^
+
+# Compile .c to .o
 $(BUILD_DIR)/%.o: $(SRC_DIR)/%.c
 	@mkdir -p $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
-	
-# Clean target to remove object files and the executable
-clean:
-	rm -f $(TARGET) $(OBJECTS)
 
-# PHONY targets
+# Clean target
+clean:
+	rm -rf $(BUILD_DIR) $(BIN_DIR)
+
 .PHONY: all clean

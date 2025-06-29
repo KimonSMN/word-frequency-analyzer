@@ -10,8 +10,6 @@
 #include <signal.h>
 #include <bits/sigaction.h>
 
-#include "splitter.h"
-#include "builder.h"
 #include "helper.h"
 
 // Global variables for signal handling.
@@ -31,12 +29,14 @@ int main(int argc, char *argv[]) {
 
     //////// HANDLE COMMAND LINE ARGUMENTS ////////
 
-    char *textFile = NULL;          // Input File to be read.
+    char *textFile      = NULL;     // Input File to be read.
     char *exclusionFile = NULL;     // Exclusion File.
-    char *outputFile = NULL;        // Output File.
-    int numOfSplitters = 0;         // Number of Splitters.
-    int numOfBuilders = 0;          // Number of Builders.
-    int topK = 0;                   // Number of Top-Popular Words.
+    char *outputFile    = NULL;     // Output File.
+    int numOfSplitters  = 0;        // Number of Splitters.
+    int numOfBuilders   = 0;        // Number of Builders.
+    int topK            = 0;        // Number of Top-Popular Words.
+
+    // Argument parsing from command line.
 
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "-i") == 0) {
@@ -57,7 +57,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-
+    // Sanity check for correct Usage.
     if (textFile == NULL || numOfSplitters < 1 || numOfBuilders < 1 || topK < 1 || exclusionFile == NULL || outputFile == NULL) {
         printf("Usage: ./lexan -i TextFile -l numOfSplitter -m numOfBuilders -t TopPopular -e ExclusionList -o OutputFile\n");
         exit(EXIT_FAILURE);
@@ -74,9 +74,7 @@ int main(int argc, char *argv[]) {
 
     // Process lines of Text File
 
-    int textFileLines = count_lines(textFile);
-
-   
+    int textFileLines = count_lines(textFile); // returns the number of lines.
     printf("Input File has: %d lines\n", textFileLines);
 
     // Process lines of Exclusion File
@@ -84,95 +82,64 @@ int main(int argc, char *argv[]) {
     int excFileLines = count_lines(exclusionFile);
 
     printf("Exclusion file has %d lines\n", excFileLines); // Debugging
-
    
 
+    //////// FORK SPLITTERS ////////
+    for (int s = 0; s < numOfSplitters; s++) {
+        int portionFrom = s * (textFileLines / numOfSplitters);         // Starting section (Splitter starts reading from here).
+        int portionTo = (s + 1) * (textFileLines / numOfSplitters);     // Ending section  (Splitter ends the reading here).
+        if (portionTo > textFileLines) {
+            portionTo = textFileLines; // Ensure the last splitter processes up to the last line.
+        }
 
-    // //////// CREATE PIPES ////////
-   
-    // int builderPipes[numOfBuilders][2];         // Pipes for Splitters & Builders, [][0] for reading by builders, [][1] for writing by splitters
-    // int builderToRootPipes[numOfBuilders][2];   // Pipes for Builders & Root,      [][0] for reading by root, [][1] for writing by builders
-    // int builderTimingPipes[numOfBuilders][2];   // Pipes for Builder's time,       [][0] for reading by root, [][1] for writing by builders
+        // If splitterIndex is the last splitter,
+        // it gets all the remaining file lines.
+        if (s == numOfSplitters - 1 || portionTo > textFileLines) {
+            portionTo = textFileLines;
+        }
+        int pid = fork();
+        if (pid == -1) {
+            perror("Error: Splitter creation failed.");
+            exit(1);
+        }
+        if (pid == 0) { // Child process (splitter).
 
-    // for (int b = 0; b< numOfBuilders; b++) {
-    //     if (pipe(builderPipes[b]) == -1
-    //         || pipe(builderToRootPipes[b]) == -1
-    //         || pipe(builderTimingPipes[b]) == -1) { 
+            char fromStr[16], toStr[16];
+            sprintf(fromStr, "%d", portionFrom);
+            sprintf(toStr, "%d", portionTo);
+            // be careful to process lines from [portionFrom, portionTo) not [from,to]!!!
+            char* args[] = {SPLITTER_PATH, fromStr, toStr, NULL};
+            execvp(args[0], args);
 
-    //         perror("Error: Pipe creation failed");
-    //         exit(1);
-    //     }
-    // }
 
-    // //////// FORK SPLITTERS ////////
+            return 1;   // Exit after processing.
+        }
+    }
 
-    // for (int s = 0; s < numOfSplitters; s++) {
-    //     int pid = fork();
-    //     if (pid == -1) { // Error checking.
-    //         perror("Error: Splitter creation failed.");
-    //         exit(1);
-    //     }
-    //     if (pid == 0) { // Child process (splitter).
-        
-    //         for (int b = 0; b < numOfBuilders;b++){ 
-    //             close(builderPipes[b][0]); // Close read ends.
-    //         }
+    //////// FORK BUILDERS ////////
 
-    //         splitter(s, numOfSplitters, numOfBuilders, textFile, textFileLines, builderPipes, exclusionFileLines, exclusionList);
+   for (int s = 0; s < numOfBuilders; s++) {
+        int pid = fork();
+        if (pid == -1) {
+            perror("Error: Builder creation failed.");
+            exit(1);
+        }
+        if (pid == 0) { // Child process (splitter).
 
-    //         for (int b = 0; b < numOfBuilders; b++) {
-    //             close(builderPipes[b][1]); // Close write ends.
-    //         }
+            char* args[] = {BUILDER_PATH, NULL};
+            execvp(args[0], args);
 
-    //         return 1;   // Exit after processing.
-    //     }
-    // }
 
-    // //////// FORK BUILDERS ////////
-
-    // for (int b = 0; b < numOfBuilders; b++) {
-    //     int pid = fork();
-    //     if (pid == -1) {
-    //         perror("Error: Builder creation failed.");
-    //         exit(1);
-    //     }
-
-    //     if (pid == 0) { // Child process
-
-    //         for (int i = 0; i < numOfBuilders; i++) {
-    //             close(builderPipes[i][1]); // Close write ends
-    //             if (i != b) {
-    //                 close(builderPipes[i][0]); // Close read ends of other builders
-    //             }
-    //             close(builderToRootPipes[i][0]); // Close read ends of builderToRootPipes
-    //             if (i != b) {
-    //                 close(builderToRootPipes[i][1]); // Close write ends of other builders
-    //             }
-    //         }
-
-    //         builder(b, numOfBuilders, builderPipes, builderToRootPipes, textFileLines, builderTimingPipes);
-
-    //         close(builderPipes[b][0]);
-    //         close(builderToRootPipes[b][1]);
-
-    //         return 1;   // Exit after processing.
-    //     }
-    // }
-
-    // // Close all pipe ends.
-    // for (int b = 0; b < numOfBuilders; b++) {
-    //     close(builderPipes[b][0]);
-    //     close(builderPipes[b][1]);
-    //     close(builderToRootPipes[b][1]);    // Close only write, we still use read end.
-    //     close(builderTimingPipes[b][1]);    // Close only write, we still use read end.
-    // }
+            return 1;   // Exit after processing.
+        }
+    }
 
     // // Wait for all child processes to finish execution.
     // for (int i = 0; i < numOfSplitters + numOfBuilders; i++) {
     //     wait(NULL);
     // }
 
-    // //////// INITIALIZE HASHTABLE ////////
+    //////// INITIALIZE HASHTABLE ////////
 
     // int wordsPerBuilder = (textFileLines * 10) / numOfBuilders; // Approximately 10 words per line.
     // int mainTableCapacity = get_hash_table_capacity(wordsPerBuilder * numOfBuilders);   // This function finds "good" hashtable sizes.

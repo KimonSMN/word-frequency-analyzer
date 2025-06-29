@@ -2,6 +2,8 @@
 #define HELPER_H
 #include <stdio.h>
 
+#define SPLITTER_PATH "bin/splitter"
+#define BUILDER_PATH "bin/builder"
 #define BUFFER_SIZE 8192 
 
 ssize_t safe_read(int fd, void *buffer, size_t n);
